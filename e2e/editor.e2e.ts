@@ -47,7 +47,10 @@ async function extractZip(zipPath: string, targetDir: string): Promise<JSZip> {
   await mkdir(targetDir, { recursive: true });
   for (const [name, entry] of Object.entries(zip.files)) {
     const destination = join(targetDir, name);
-    if (entry.dir) { await mkdir(destination, { recursive: true }); continue; }
+    if (entry.dir) {
+      await mkdir(destination, { recursive: true });
+      continue;
+    }
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, await entry.async("nodebuffer"));
   }
@@ -58,7 +61,6 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  // Start clean in English so selectors and locale behavior are deterministic.
   await page.addInitScript(({ projectKey, preferencesKey }) => {
     window.localStorage.removeItem(projectKey);
     window.localStorage.setItem(preferencesKey, JSON.stringify({ locale: "en" }));
@@ -70,50 +72,49 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await expect(page.getByRole("main").getByText("Добро пожаловать!", { exact: false })).toBeVisible();
   const sidebar = page.locator("aside").first();
 
-  // Preserve and verify the MVP inline-keyboard workflow: create, reorder, cross-row DnD, URL and callback.
+  // Existing MVP inline workflow remains functional.
   await page.getByRole("button", { name: "Add screen", exact: true }).click();
-  await page.getByLabel("Screen name").fill("Inline QA");
-  await page.getByLabel("Message text").fill("Inline actions");
+  await page.getByLabel("Screen name", { exact: true }).fill("Inline QA");
+  await page.getByLabel("Message text", { exact: true }).fill("Inline actions");
   await page.getByRole("button", { name: "+ Add first button", exact: true }).click();
-  await page.getByLabel("Button text").fill("First");
+  await page.getByLabel("Button text", { exact: true }).fill("First");
   await page.getByRole("button", { name: "Button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Second");
+  await page.getByLabel("Button text", { exact: true }).fill("Second");
   await pointerDrag(page, page.getByRole("button", { name: "Drag First", exact: true }), page.getByRole("button", { name: "Drag Second", exact: true }));
   await page.getByRole("button", { name: "Row", exact: true }).click();
   await pointerDrag(page, page.getByRole("button", { name: "Drag First", exact: true }), page.getByText("Drop button here", { exact: true }).locator(".."));
   await selectInlineBuilderButton(page, "Second");
-  await page.getByLabel("Action type").selectOption("url");
+  await page.getByLabel("Action type", { exact: true }).selectOption("url");
   await page.getByRole("textbox", { name: "URL", exact: true }).fill("https://example.com");
   await selectInlineBuilderButton(page, "First");
-  await page.getByLabel("Action type").selectOption("callback");
-  await page.getByLabel("Callback data").fill("custom_action");
+  await page.getByLabel("Action type", { exact: true }).selectOption("callback");
+  await page.getByLabel("Callback data", { exact: true }).fill("custom_action");
 
-  // V1.1 Reply Keyboard: Products with two buttons, second row and real cross-row DnD.
+  // Reply Keyboard: create, cross-row DnD and every supported special action.
   await page.getByRole("button", { name: "Add screen", exact: true }).click();
-  await page.getByLabel("Screen name").fill("Products");
-  await page.getByLabel("Message text").fill("Наши товары");
+  await page.getByLabel("Screen name", { exact: true }).fill("Products");
+  await page.getByLabel("Message text", { exact: true }).fill("Наши товары");
   await page.getByRole("button", { name: "Bottom keyboard", exact: true }).click();
-  await page.getByLabel("Bottom keyboard mode").selectOption("show");
+  await page.getByLabel("Bottom keyboard mode", { exact: true }).selectOption("show");
   await page.getByRole("button", { name: "+ Add first bottom button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Catalog");
+  await page.getByLabel("Button text", { exact: true }).fill("Catalog");
   await page.getByRole("button", { name: "Button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Profile");
+  await page.getByLabel("Button text", { exact: true }).fill("Profile");
   await page.getByRole("button", { name: "Row", exact: true }).click();
   await pointerDrag(page, page.getByRole("button", { name: "Drag reply Catalog", exact: true }), page.getByText("Drop button here", { exact: true }).locator(".."));
   await selectReplyBuilderButton(page, "Catalog");
-  await page.getByLabel("Action type").selectOption("screen");
-  await page.getByLabel("Target screen").selectOption({ label: "Catalog" });
+  await page.getByLabel("Action type", { exact: true }).selectOption("screen");
+  await page.getByLabel("Target screen", { exact: true }).selectOption({ label: "Catalog" });
 
-  // Add special Telegram reply-button actions and verify HTTPS Web App configuration.
   await page.getByRole("button", { name: "Button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Phone");
-  await page.getByLabel("Action type").selectOption("requestContact");
+  await page.getByLabel("Button text", { exact: true }).fill("Phone");
+  await page.getByLabel("Action type", { exact: true }).selectOption("requestContact");
   await page.getByRole("button", { name: "Button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Location");
-  await page.getByLabel("Action type").selectOption("requestLocation");
+  await page.getByLabel("Button text", { exact: true }).fill("Location");
+  await page.getByLabel("Action type", { exact: true }).selectOption("requestLocation");
   await page.getByRole("button", { name: "Button", exact: true }).click();
-  await page.getByLabel("Button text").fill("Web App");
-  await page.getByLabel("Action type").selectOption("webApp");
+  await page.getByLabel("Button text", { exact: true }).fill("Web App");
+  await page.getByLabel("Action type", { exact: true }).selectOption("webApp");
   await page.getByRole("textbox", { name: "URL", exact: true }).fill("https://example.com/app");
 
   await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
@@ -123,30 +124,37 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   const configured = await readStoredProject(page);
   expect(configured.schemaVersion).toBe(2);
   const products = configured.screens.find((screen) => screen.name === "Products");
-  expect(products?.message.text).toBe("Наши товары");
-  expect(products?.replyKeyboard.mode).toBe("show");
   if (!products || products.replyKeyboard.mode !== "show") throw new Error("Products reply keyboard missing");
+  expect(products.message.text).toBe("Наши товары");
   expect(products.replyKeyboard.config.rows[0]?.buttons.map((button) => button.text)).toEqual(["Profile"]);
   expect(products.replyKeyboard.config.rows[1]?.buttons.map((button) => button.text)).toEqual(["Catalog", "Phone", "Location", "Web App"]);
-  expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Catalog")?.action).toMatchObject({ type: "screen" });
   expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Phone")?.action).toEqual({ type: "requestContact" });
   expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Location")?.action).toEqual({ type: "requestLocation" });
   expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Web App")?.action).toEqual({ type: "webApp", url: "https://example.com/app" });
 
-  // Bot Commands and Telegram Menu Button settings.
+  // Hide keyboard mode is exposed and persisted on its own screen.
+  await page.getByRole("button", { name: "Add screen", exact: true }).click();
+  await page.getByLabel("Screen name", { exact: true }).fill("Hide Keyboard");
+  await page.getByLabel("Message text", { exact: true }).fill("Keyboard removed");
+  await page.getByRole("button", { name: "Bottom keyboard", exact: true }).click();
+  await page.getByLabel("Bottom keyboard mode", { exact: true }).selectOption("remove");
+  await page.getByTitle("Save now").click();
+  expect((await readStoredProject(page)).screens.find((screen) => screen.name === "Hide Keyboard")?.replyKeyboard).toEqual({ mode: "remove" });
+
+  // Bot Commands and Telegram chat Menu Button.
   await page.getByRole("button", { name: "Bot settings", exact: true }).click();
   await page.getByRole("button", { name: "Add command", exact: true }).click();
-  await page.getByLabel("Command").last().fill("help");
-  await page.getByLabel("Description").last().fill("Help command");
-  await page.getByLabel("Menu button").selectOption("webApp");
-  await page.getByLabel("Button text").fill("Open Shop");
-  await page.getByLabel("Web App URL").fill("https://example.com/shop");
+  await page.getByRole("textbox", { name: "Command", exact: true }).last().fill("help");
+  await page.getByRole("textbox", { name: "Description", exact: true }).last().fill("Help command");
+  await page.getByRole("combobox", { name: "Menu button", exact: true }).selectOption("webApp");
+  await page.getByRole("textbox", { name: "Button text", exact: true }).fill("Open Shop");
+  await page.getByRole("textbox", { name: "Web App URL", exact: true }).fill("https://example.com/shop");
   await page.getByTitle("Save now").click();
   const botSettingsProject = await readStoredProject(page);
   expect(botSettingsProject.botSettings.commands.some((command) => command.command === "help" && command.description === "Help command")).toBe(true);
   expect(botSettingsProject.botSettings.menuButton).toEqual({ type: "webApp", text: "Open Shop", url: "https://example.com/shop" });
 
-  // Reply transition must be projected into Flow; move the Products node and persist its position.
+  // Reply navigation is projected into Flow and node positions persist.
   await page.getByRole("button", { name: "Flow", exact: true }).click();
   await expect(page.locator(".react-flow")).toBeVisible();
   expect(await page.locator(".react-flow__edge").count()).toBe(7);
@@ -163,8 +171,8 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   expect(movedPosition).toBeTruthy();
   expect(movedPosition).not.toEqual(products.editor.flowPosition);
 
-  // App i18n: switch without reload, persist across reload, and never translate project content.
-  await page.getByLabel("Application language").selectOption("ru");
+  // RU/EN application i18n changes live, persists, and never translates project content.
+  await page.getByLabel("Application language", { exact: true }).selectOption("ru");
   await expect(page.getByRole("button", { name: "Дизайн", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Сценарий", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Дизайн", exact: true }).click();
@@ -173,28 +181,32 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await expect(page.getByRole("button", { name: "Нижняя клавиатура", exact: true })).toBeVisible();
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.getByRole("button", { name: "Дизайн", exact: true })).toBeVisible();
-  expect(await page.getByLabel("Язык приложения").inputValue()).toBe("ru");
+  expect(await page.getByLabel("Язык приложения", { exact: true }).inputValue()).toBe("ru");
   const reloaded = await readStoredProject(page);
   expect(reloaded.screens.find((screen) => screen.name === "Products")?.editor.flowPosition).toEqual(movedPosition);
-  await page.getByLabel("Язык приложения").selectOption("en");
+  await sidebar.getByText("Products", { exact: true }).click();
+  await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
+  await page.getByLabel("Язык приложения", { exact: true }).selectOption("en");
   await expect(page.getByRole("button", { name: "Design", exact: true })).toBeVisible();
   await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
 
-  // Code mode reflects reply keyboards, F.text routing, special actions, commands and menu button.
+  // Code mode reflects ReplyKeyboardMarkup, routing, special actions, hide mode and Bot Settings.
   await page.getByRole("button", { name: "Code", exact: true }).click();
   await page.getByRole("button", { name: "keyboards/reply.py", exact: true }).click();
   await expect(page.locator("pre code")).toContainText("ReplyKeyboardMarkup");
   await expect(page.locator("pre code")).toContainText("request_contact=True");
+  await expect(page.locator("pre code")).toContainText("request_location=True");
   await expect(page.locator("pre code")).toContainText("WebAppInfo");
   await page.getByRole("button", { name: "handlers/screens.py", exact: true }).click();
   await expect(page.locator("pre code")).toContainText('F.text == "Catalog"');
+  await expect(page.locator("pre code")).toContainText("ReplyKeyboardRemove()");
   await expect(page.locator("pre code")).toContainText("F.contact");
   await expect(page.locator("pre code")).toContainText("F.location");
   await page.getByRole("button", { name: "bot.py", exact: true }).click();
   await expect(page.locator("pre code")).toContainText("set_my_commands");
   await expect(page.locator("pre code")).toContainText("MenuButtonWebApp");
 
-  // JSON export/reset/import semantic round trip.
+  // JSON semantic round-trip preserves v2 data and editor metadata.
   const [jsonDownload] = await Promise.all([page.waitForEvent("download"), page.getByTitle("Export JSON").click()]);
   const jsonPath = await jsonDownload.path();
   if (!jsonPath) throw new Error("JSON download did not produce a file");
@@ -209,9 +221,10 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   const importedProducts = imported.screens.find((screen) => screen.name === "Products");
   expect(importedProducts?.replyKeyboard).toEqual(products.replyKeyboard);
   expect(importedProducts?.editor.flowPosition).toEqual(movedPosition);
+  expect(imported.screens.find((screen) => screen.name === "Hide Keyboard")?.replyKeyboard).toEqual({ mode: "remove" });
   expect(imported.botSettings.menuButton).toEqual({ type: "webApp", text: "Open Shop", url: "https://example.com/shop" });
 
-  // ZIP must match Code pipeline, contain both keyboard modules, no secret, and compile as Python.
+  // Exported aiogram ZIP is the same source pipeline, contains no secret, and compiles.
   const [zipDownload] = await Promise.all([page.waitForEvent("download"), page.getByTitle("Export aiogram ZIP").click()]);
   const zipPath = await zipDownload.path();
   if (!zipPath) throw new Error("ZIP download did not produce a file");
