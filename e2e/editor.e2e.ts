@@ -91,7 +91,7 @@ test("mandatory MVP browser smoke scenario", async ({ page }, testInfo) => {
   // 10-11. Configure URL and custom callback actions on the Products buttons.
   await selectBuilderButton(page, "Second");
   await page.getByLabel("Action type").selectOption("url");
-  await page.getByLabel("URL").fill("https://example.com");
+  await page.getByRole("textbox", { name: "URL", exact: true }).fill("https://example.com");
 
   await selectBuilderButton(page, "First");
   await page.getByLabel("Action type").selectOption("callback");
