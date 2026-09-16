@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - bootstrap.tar.gz.b64
-      - .github/workflows/bootstrap.yml
+      - 'bootstrap.part.*'
+      - '.github/workflows/bootstrap.yml'
   workflow_dispatch:
 
 permissions:
@@ -19,16 +19,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Unpack source tree
+      - name: Reassemble and unpack source tree
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/tflow-bootstrap
+          rm -rf /tmp/tflow-bootstrap /tmp/tflow.tar.gz
           mkdir -p /tmp/tflow-bootstrap
-          base64 --decode bootstrap.tar.gz.b64 > /tmp/tflow.tar.gz
+          cat bootstrap.part.* | base64 --decode > /tmp/tflow.tar.gz
           tar -xzf /tmp/tflow.tar.gz -C /tmp/tflow-bootstrap
           rsync -a --delete --exclude='.git/' /tmp/tflow-bootstrap/ ./
-          rm -f bootstrap.tar.gz.b64 .github/workflows/bootstrap.yml
+          rm -f bootstrap.tar.gz.b64 bootstrap.part.* .github/workflows/bootstrap.yml
 
       - name: Commit unpacked source
         shell: bash
