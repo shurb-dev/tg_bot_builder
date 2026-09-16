@@ -73,13 +73,14 @@ export function PropertiesPanel() {
   const buttonId = selection.buttonId;
   const button = getButton(project, selection.screenId, rowId, buttonId);
   if (!button) return null;
+  const screenId = screen.id;
   const buttonIssues = issues.filter((issue) => issue.buttonId === button.id);
   const callbackBytes = button.action.type === "callback" ? utf8ByteLength(button.action.callbackData) : 0;
 
   function changeType(type: "screen" | "callback" | "url") {
-    if (type === "screen") setButtonAction(screen.id, rowId, buttonId, { type: "screen", screenId: project.screens[0]?.id ?? screen.id });
-    if (type === "callback") setButtonAction(screen.id, rowId, buttonId, { type: "callback", callbackData: "action" });
-    if (type === "url") setButtonAction(screen.id, rowId, buttonId, { type: "url", url: "https://example.com" });
+    if (type === "screen") setButtonAction(screenId, rowId, buttonId, { type: "screen", screenId: project.screens[0]?.id ?? screenId });
+    if (type === "callback") setButtonAction(screenId, rowId, buttonId, { type: "callback", callbackData: "action" });
+    if (type === "url") setButtonAction(screenId, rowId, buttonId, { type: "url", url: "https://example.com" });
   }
 
   return (
