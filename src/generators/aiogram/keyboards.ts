@@ -2,63 +2,93 @@ import type { Project, Screen } from "../../domain/project/types";
 import { routeForScreen } from "./callbacks";
 import { pyString, safePythonIdentifier } from "./templates";
 
-function screenFunctionName(screen: Screen): string {
-  return `keyboard_${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}`;
+function suffix(screen: Screen): string {
+  return `${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}`;
 }
 
-export function keyboardFunctionName(screen: Screen): string {
-  return screenFunctionName(screen);
+export function inlineKeyboardFunctionName(screen: Screen): string {
+  return `inline_keyboard_${suffix(screen)}`;
 }
 
-export function generateKeyboards(project: Project, routes: Map<string, string>): string {
-  const parts: string[] = [
-    "from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup",
-    "",
-  ];
+export function replyKeyboardFunctionName(screen: Screen): string {
+  return `reply_keyboard_${suffix(screen)}`;
+}
+
+// Backward-compatible export used by older internal callers.
+export const keyboardFunctionName = inlineKeyboardFunctionName;
+
+export function generateInlineKeyboards(project: Project, routes: Map<string, string>): string {
+  const parts: string[] = ["from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup", ""];
 
   for (const screen of project.screens) {
-    const functionName = screenFunctionName(screen);
+    const functionName = inlineKeyboardFunctionName(screen);
     parts.push(`def ${functionName}() -> InlineKeyboardMarkup | None:`);
-    if (screen.keyboard.length === 0 || screen.keyboard.every((row) => row.buttons.length === 0)) {
+    if (screen.inlineKeyboard.length === 0 || screen.inlineKeyboard.every((row) => row.buttons.length === 0)) {
       parts.push("    return None", "");
       continue;
     }
-
     parts.push("    return InlineKeyboardMarkup(", "        inline_keyboard=[");
-    for (const row of screen.keyboard) {
-      if (row.buttons.length === 0) continue;
+    for (const row of screen.inlineKeyboard) {
+      if (!row.buttons.length) continue;
       parts.push("            [");
       for (const button of row.buttons) {
         if (button.action.type === "screen") {
-          const targetScreenId = button.action.screenId;
-          const target = project.screens.find((candidate) => candidate.id === targetScreenId);
-          if (!target) throw new Error(`Button ${button.id} points to missing screen ${targetScreenId}`);
-          parts.push(
-            "                InlineKeyboardButton(",
-            `                    text=${pyString(button.text)},`,
-            `                    callback_data=${pyString(routeForScreen(routes, target))},`,
-            "                ),",
-          );
+          const target = project.screens.find((candidate) => candidate.id === button.action.screenId);
+          if (!target) throw new Error(`Button ${button.id} points to missing screen ${button.action.screenId}`);
+          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    callback_data=${pyString(routeForScreen(routes, target))},`, "                ),");
         } else if (button.action.type === "url") {
-          parts.push(
-            "                InlineKeyboardButton(",
-            `                    text=${pyString(button.text)},`,
-            `                    url=${pyString(button.action.url)},`,
-            "                ),",
-          );
+          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    url=${pyString(button.action.url)},`, "                ),");
         } else {
-          parts.push(
-            "                InlineKeyboardButton(",
-            `                    text=${pyString(button.text)},`,
-            `                    callback_data=${pyString(button.action.callbackData)},`,
-            "                ),",
-          );
+          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    callback_data=${pyString(button.action.callbackData)},`, "                ),");
         }
       }
       parts.push("            ],");
     }
     parts.push("        ]", "    )", "");
   }
-
   return `${parts.join("\n").trimEnd()}\n`;
 }
+
+function pyBool(value: boolean): string {
+  return value ? "True" : "False";
+}
+
+export function generateReplyKeyboards(project: Project): string {
+  const parts: string[] = ["from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo", ""];
+  for (const screen of project.screens) {
+    if (screen.replyKeyboard.mode !== "show") continue;
+    const functionName = replyKeyboardFunctionName(screen);
+    const config = screen.replyKeyboard.config;
+    parts.push(`def ${functionName}() -> ReplyKeyboardMarkup:`);
+    parts.push("    return ReplyKeyboardMarkup(", "        keyboard=[");
+    for (const row of config.rows) {
+      if (!row.buttons.length) continue;
+      parts.push("            [");
+      for (const button of row.buttons) {
+        if (button.action.type === "requestContact") {
+          parts.push(`                KeyboardButton(text=${pyString(button.text)}, request_contact=True),`);
+        } else if (button.action.type === "requestLocation") {
+          parts.push(`                KeyboardButton(text=${pyString(button.text)}, request_location=True),`);
+        } else if (button.action.type === "webApp") {
+          parts.push(`                KeyboardButton(text=${pyString(button.text)}, web_app=WebAppInfo(url=${pyString(button.action.url)})),`);
+        } else {
+          parts.push(`                KeyboardButton(text=${pyString(button.text)}),`);
+        }
+      }
+      parts.push("            ],");
+    }
+    parts.push(
+      "        ],",
+      `        resize_keyboard=${pyBool(config.resizeKeyboard)},`,
+      `        one_time_keyboard=${pyBool(config.oneTimeKeyboard)},`,
+      `        is_persistent=${pyBool(config.isPersistent)},`,
+      `        selective=${pyBool(config.selective)},`,
+      `        input_field_placeholder=${config.inputFieldPlaceholder ? pyString(config.inputFieldPlaceholder) : "None"},`,
+      "    )",
+      "",
+    );
+  }
+  return `${parts.join("\n").trimEnd()}\n`;
+}
+
+export const generateKeyboards = generateInlineKeyboards;
