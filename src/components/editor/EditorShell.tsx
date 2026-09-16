@@ -77,9 +77,28 @@ export function EditorShell() {
       const target = event.target as HTMLElement | null;
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
       const mod = event.ctrlKey || event.metaKey;
-      if (mod && event.key.toLowerCase() === "s") { event.preventDefault(); persistNow(); return; }
-      if (mod && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
-      if (event.key === "Escape") { clearSelection(); return; }
+      if (mod && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        persistNow();
+        return;
+      }
+      if (mod && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        if (validationOpen) {
+          setValidationOpen(false);
+        } else {
+          clearSelection();
+        }
+        return;
+      }
       if (!typing && (event.key === "Delete" || event.key === "Backspace") && selection?.type === "button") {
         event.preventDefault();
         removeButton(selection.screenId, selection.rowId, selection.buttonId);
@@ -87,7 +106,7 @@ export function EditorShell() {
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [persistNow, undo, redo, clearSelection, selection, removeButton]);
+  }, [persistNow, undo, redo, clearSelection, selection, removeButton, validationOpen]);
 
   useEffect(() => {
     if (!toast) return;
@@ -123,7 +142,10 @@ export function EditorShell() {
   }
 
   async function exportZip() {
-    if (hasBlockingErrors(issues)) { setValidationOpen(true); return; }
+    if (hasBlockingErrors(issues)) {
+      setValidationOpen(true);
+      return;
+    }
     try {
       const generated = generateAiogramProject(project);
       const blob = await buildProjectZip(generated);
