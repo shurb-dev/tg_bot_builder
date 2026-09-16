@@ -14,7 +14,6 @@ export function replyKeyboardFunctionName(screen: Screen): string {
   return `reply_keyboard_${suffix(screen)}`;
 }
 
-// Backward-compatible export used by older internal callers.
 export const keyboardFunctionName = inlineKeyboardFunctionName;
 
 export function generateInlineKeyboards(project: Project, routes: Map<string, string>): string {
@@ -27,19 +26,37 @@ export function generateInlineKeyboards(project: Project, routes: Map<string, st
       parts.push("    return None", "");
       continue;
     }
+
     parts.push("    return InlineKeyboardMarkup(", "        inline_keyboard=[");
     for (const row of screen.inlineKeyboard) {
       if (!row.buttons.length) continue;
       parts.push("            [");
       for (const button of row.buttons) {
-        if (button.action.type === "screen") {
-          const target = project.screens.find((candidate) => candidate.id === button.action.screenId);
-          if (!target) throw new Error(`Button ${button.id} points to missing screen ${button.action.screenId}`);
-          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    callback_data=${pyString(routeForScreen(routes, target))},`, "                ),");
-        } else if (button.action.type === "url") {
-          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    url=${pyString(button.action.url)},`, "                ),");
+        const action = button.action;
+        if (action.type === "screen") {
+          const targetScreenId = action.screenId;
+          const target = project.screens.find((candidate) => candidate.id === targetScreenId);
+          if (!target) throw new Error(`Button ${button.id} points to missing screen ${targetScreenId}`);
+          parts.push(
+            "                InlineKeyboardButton(",
+            `                    text=${pyString(button.text)},`,
+            `                    callback_data=${pyString(routeForScreen(routes, target))},`,
+            "                ),",
+          );
+        } else if (action.type === "url") {
+          parts.push(
+            "                InlineKeyboardButton(",
+            `                    text=${pyString(button.text)},`,
+            `                    url=${pyString(action.url)},`,
+            "                ),",
+          );
         } else {
-          parts.push("                InlineKeyboardButton(", `                    text=${pyString(button.text)},`, `                    callback_data=${pyString(button.action.callbackData)},`, "                ),");
+          parts.push(
+            "                InlineKeyboardButton(",
+            `                    text=${pyString(button.text)},`,
+            `                    callback_data=${pyString(action.callbackData)},`,
+            "                ),",
+          );
         }
       }
       parts.push("            ],");
@@ -65,12 +82,13 @@ export function generateReplyKeyboards(project: Project): string {
       if (!row.buttons.length) continue;
       parts.push("            [");
       for (const button of row.buttons) {
-        if (button.action.type === "requestContact") {
+        const action = button.action;
+        if (action.type === "requestContact") {
           parts.push(`                KeyboardButton(text=${pyString(button.text)}, request_contact=True),`);
-        } else if (button.action.type === "requestLocation") {
+        } else if (action.type === "requestLocation") {
           parts.push(`                KeyboardButton(text=${pyString(button.text)}, request_location=True),`);
-        } else if (button.action.type === "webApp") {
-          parts.push(`                KeyboardButton(text=${pyString(button.text)}, web_app=WebAppInfo(url=${pyString(button.action.url)})),`);
+        } else if (action.type === "webApp") {
+          parts.push(`                KeyboardButton(text=${pyString(button.text)}, web_app=WebAppInfo(url=${pyString(action.url)})),`);
         } else {
           parts.push(`                KeyboardButton(text=${pyString(button.text)}),`);
         }

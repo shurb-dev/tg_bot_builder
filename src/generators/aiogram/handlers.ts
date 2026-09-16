@@ -24,9 +24,22 @@ function renderSender(screen: Screen): string[] {
   const parseMode = parseModeArgument(screen);
   const markup = replyMarkup(screen);
   if (screen.message.media?.type === "photo") {
-    lines.push("    await message.answer_photo(", `        photo=${pyString(screen.message.media.url)},`, `        caption=${text},`, `        parse_mode=${parseMode},`, `        reply_markup=${markup},`, "    )");
+    lines.push(
+      "    await message.answer_photo(",
+      `        photo=${pyString(screen.message.media.url)},`,
+      `        caption=${text},`,
+      `        parse_mode=${parseMode},`,
+      `        reply_markup=${markup},`,
+      "    )",
+    );
   } else {
-    lines.push("    await message.answer(", `        text=${text},`, `        parse_mode=${parseMode},`, `        reply_markup=${markup},`, "    )");
+    lines.push(
+      "    await message.answer(",
+      `        text=${text},`,
+      `        parse_mode=${parseMode},`,
+      `        reply_markup=${markup},`,
+      "    )",
+    );
   }
   return lines;
 }
@@ -52,7 +65,12 @@ export function generateHandlers(project: Project, routes: Map<string, string>):
   for (const screen of project.screens) {
     if (!screen.trigger) continue;
     const command = normalizeCommand(screen.trigger.command);
-    lines.push(`@router.message(Command(${pyString(command)}))`, `async def command_${safePythonIdentifier(command)}_${screen.id.replace(/-/g, "").slice(0, 6)}(message: Message) -> None:`, `    await ${senderName(screen)}(message)`, "");
+    lines.push(
+      `@router.message(Command(${pyString(command)}))`,
+      `async def command_${safePythonIdentifier(command)}_${screen.id.replace(/-/g, "").slice(0, 6)}(message: Message) -> None:`,
+      `    await ${senderName(screen)}(message)`,
+      "",
+    );
   }
 
   for (const screen of project.screens) {
@@ -72,16 +90,33 @@ export function generateHandlers(project: Project, routes: Map<string, string>):
     if (screen.replyKeyboard.mode !== "show") continue;
     for (const row of screen.replyKeyboard.config.rows) {
       for (const button of row.buttons) {
-        if (button.action.type !== "screen") continue;
-        const target = project.screens.find((candidate) => candidate.id === button.action.screenId);
-        if (!target) throw new Error(`Reply button ${button.id} points to missing screen ${button.action.screenId}`);
-        lines.push(`@router.message(F.text == ${pyString(button.text)})`, `async def reply_nav_${button.id.replace(/-/g, "").slice(0, 10)}(message: Message) -> None:`, `    await ${senderName(target)}(message)`, "");
+        const action = button.action;
+        if (action.type !== "screen") continue;
+        const targetScreenId = action.screenId;
+        const target = project.screens.find((candidate) => candidate.id === targetScreenId);
+        if (!target) throw new Error(`Reply button ${button.id} points to missing screen ${targetScreenId}`);
+        lines.push(
+          `@router.message(F.text == ${pyString(button.text)})`,
+          `async def reply_nav_${button.id.replace(/-/g, "").slice(0, 10)}(message: Message) -> None:`,
+          `    await ${senderName(target)}(message)`,
+          "",
+        );
       }
     }
   }
 
-  const textActions = [...new Set(project.screens.flatMap((screen) => screen.replyKeyboard.mode === "show" ? screen.replyKeyboard.config.rows.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "text" ? [button.text] : [])) : []))].sort();
-  textActions.forEach((text, index) => lines.push(`@router.message(F.text == ${pyString(text)})`, `async def reply_text_${index + 1}(message: Message) -> None:`, "    # TODO: Replace this stub with application-specific logic.", "    await message.answer(\"Action received\")", ""));
+  const textActions = [...new Set(project.screens.flatMap((screen) =>
+    screen.replyKeyboard.mode === "show"
+      ? screen.replyKeyboard.config.rows.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "text" ? [button.text] : []))
+      : [],
+  ))].sort();
+  textActions.forEach((text, index) => lines.push(
+    `@router.message(F.text == ${pyString(text)})`,
+    `async def reply_text_${index + 1}(message: Message) -> None:`,
+    "    # TODO: Replace this stub with application-specific logic.",
+    "    await message.answer(\"Action received\")",
+    "",
+  ));
 
   const hasContact = project.screens.some((screen) => screen.replyKeyboard.mode === "show" && screen.replyKeyboard.config.rows.some((row) => row.buttons.some((button) => button.action.type === "requestContact")));
   if (hasContact) lines.push("@router.message(F.contact)", "async def received_contact(message: Message) -> None:", "    # TODO: Handle the shared contact.", "    await message.answer(\"Contact received\")", "");
@@ -91,7 +126,13 @@ export function generateHandlers(project: Project, routes: Map<string, string>):
   if (hasWebApp) lines.push("@router.message(F.web_app_data)", "async def received_web_app_data(message: Message) -> None:", "    # TODO: Handle data sent back by the Web App.", "    await message.answer(\"Web App data received\")", "");
 
   const customCallbacks = [...new Set(project.screens.flatMap((screen) => screen.inlineKeyboard.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "callback" ? [button.action.callbackData] : []))))].sort();
-  customCallbacks.forEach((callbackData, index) => lines.push(`@router.callback_query(F.data == ${pyString(callbackData)})`, `async def custom_callback_${index + 1}(callback: CallbackQuery) -> None:`, "    # TODO: Replace this stub with your application-specific business logic.", "    await callback.answer(\"Action received\")", ""));
+  customCallbacks.forEach((callbackData, index) => lines.push(
+    `@router.callback_query(F.data == ${pyString(callbackData)})`,
+    `async def custom_callback_${index + 1}(callback: CallbackQuery) -> None:`,
+    "    # TODO: Replace this stub with your application-specific business logic.",
+    "    await callback.answer(\"Action received\")",
+    "",
+  ));
 
   return `${lines.join("\n").trimEnd()}\n`;
 }

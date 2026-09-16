@@ -22,7 +22,14 @@ describe("project persistence v2", () => {
       name: current.name,
       createdAt: current.createdAt,
       updatedAt: current.updatedAt,
-      screens: current.screens.map(({ inlineKeyboard, replyKeyboard: _replyKeyboard, ...screen }) => ({ ...screen, keyboard: inlineKeyboard })),
+      screens: current.screens.map((screen) => ({
+        id: screen.id,
+        name: screen.name,
+        trigger: screen.trigger,
+        message: screen.message,
+        keyboard: screen.inlineKeyboard,
+        editor: screen.editor,
+      })),
     };
     const migrated = importProjectJson(JSON.stringify(legacy));
     expect(migrated.schemaVersion).toBe(2);
