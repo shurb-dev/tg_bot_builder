@@ -1,4 +1,15 @@
-import type { ButtonAction, InlineButton, KeyboardRow, Project, Screen } from "./types";
+import type {
+  BotCommand,
+  ButtonAction,
+  InlineButton,
+  InlineKeyboardRow,
+  Project,
+  ReplyKeyboardAction,
+  ReplyKeyboardButton,
+  ReplyKeyboardConfig,
+  ReplyKeyboardRow,
+  Screen,
+} from "./types";
 
 export const createId = (): string => crypto.randomUUID();
 const isoNow = (): string => new Date().toISOString();
@@ -11,8 +22,31 @@ export function createButton(text = "Новая кнопка", action?: ButtonAc
   };
 }
 
-export function createRow(buttons: InlineButton[] = []): KeyboardRow {
+export function createRow(buttons: InlineButton[] = []): InlineKeyboardRow {
   return { id: createId(), buttons };
+}
+
+export function createReplyButton(text = "Новая кнопка", action?: ReplyKeyboardAction): ReplyKeyboardButton {
+  return { id: createId(), text, action: action ?? { type: "text" } };
+}
+
+export function createReplyRow(buttons: ReplyKeyboardButton[] = []): ReplyKeyboardRow {
+  return { id: createId(), buttons };
+}
+
+export function createReplyKeyboardConfig(): ReplyKeyboardConfig {
+  return {
+    rows: [],
+    resizeKeyboard: true,
+    oneTimeKeyboard: false,
+    isPersistent: true,
+    selective: false,
+    inputFieldPlaceholder: null,
+  };
+}
+
+export function createBotCommand(command = "start", description = "Start bot"): BotCommand {
+  return { id: createId(), command, description };
 }
 
 export function createScreen(name = "New Screen", position = { x: 0, y: 0 }): Screen {
@@ -21,7 +55,8 @@ export function createScreen(name = "New Screen", position = { x: 0, y: 0 }): Sc
     name,
     trigger: null,
     message: { text: "", parseMode: "none", media: null },
-    keyboard: [],
+    inlineKeyboard: [],
+    replyKeyboard: { mode: "inherit" },
     editor: { flowPosition: position },
   };
 }
@@ -31,11 +66,12 @@ export function createEmptyProject(name = "Untitled Bot"): Project {
   const screen = createScreen("Main Menu", { x: 80, y: 80 });
   screen.trigger = { type: "command", command: "start" };
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: createId(),
     name,
     createdAt: now,
     updatedAt: now,
+    botSettings: { commands: [createBotCommand("start", "Start bot")], menuButton: { type: "commands" } },
     screens: [screen],
   };
 }
@@ -53,7 +89,7 @@ export function createDemoProject(): Project {
   profile.message.text = "Профиль\n\nЗдесь будет информация пользователя.";
   support.message.text = "Поддержка\n\nОпишите ваш вопрос.";
 
-  main.keyboard = [
+  main.inlineKeyboard = [
     createRow([
       createButton("🛒 Каталог", { type: "screen", screenId: catalog.id }),
       createButton("👤 Профиль", { type: "screen", screenId: profile.id }),
@@ -62,17 +98,16 @@ export function createDemoProject(): Project {
   ];
 
   for (const child of [catalog, profile, support]) {
-    child.keyboard = [
-      createRow([createButton("← Назад", { type: "screen", screenId: main.id })]),
-    ];
+    child.inlineKeyboard = [createRow([createButton("← Назад", { type: "screen", screenId: main.id })])];
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: createId(),
     name: "Demo Telegram Bot",
     createdAt: now,
     updatedAt: now,
+    botSettings: { commands: [createBotCommand("start", "Start bot")], menuButton: { type: "commands" } },
     screens: [main, catalog, profile, support],
   };
 }
