@@ -27,8 +27,8 @@ jobs:
           mkdir -p /tmp/tflow-bootstrap
           cat bootstrap.part.* | base64 --decode > /tmp/tflow.tar.gz
           tar -xzf /tmp/tflow.tar.gz -C /tmp/tflow-bootstrap
-          rsync -a --delete --exclude='.git/' /tmp/tflow-bootstrap/ ./
-          rm -f bootstrap.tar.gz.b64 bootstrap.part.* .github/workflows/bootstrap.yml
+          rsync -a --delete --exclude='.git/' --exclude='.github/workflows/' /tmp/tflow-bootstrap/ ./
+          rm -f bootstrap.tar.gz.b64 bootstrap.part.*
 
       - name: Commit unpacked source
         shell: bash
