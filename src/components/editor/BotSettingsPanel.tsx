@@ -24,8 +24,8 @@ export function BotSettingsPanel() {
         <div className="space-y-2">
           {project.botSettings.commands.map((command) => (
             <div key={command.id} className="grid grid-cols-[180px_1fr_auto] gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-              <Field label={t.botSettings.command}><div className="relative"><span className="absolute left-3 top-2.5 text-slate-600">/</span><input className={`${inputClass} pl-6`} value={command.command} onChange={(event) => updateBotCommand(command.id, { command: event.target.value.replace(/^\/+/, "") })} /></div></Field>
-              <Field label={t.botSettings.description}><input className={inputClass} value={command.description} onChange={(event) => updateBotCommand(command.id, { description: event.target.value })} /></Field>
+              <Field label={t.botSettings.command}><div className="relative"><span className="absolute left-3 top-2.5 text-slate-600">/</span><input aria-label={t.botSettings.command} className={`${inputClass} pl-6`} value={command.command} onChange={(event) => updateBotCommand(command.id, { command: event.target.value.replace(/^\/+/, "") })} /></div></Field>
+              <Field label={t.botSettings.description}><input aria-label={t.botSettings.description} className={inputClass} value={command.description} onChange={(event) => updateBotCommand(command.id, { description: event.target.value })} /></Field>
               <button className="mt-6 rounded-lg p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => deleteBotCommand(command.id)} aria-label={t.botSettings.deleteCommand} title={t.botSettings.deleteCommand}><Trash2 size={15} /></button>
             </div>
           ))}
@@ -33,14 +33,14 @@ export function BotSettingsPanel() {
       </section>
       <section className="space-y-4 border-t border-slate-800 pt-5">
         <Field label={t.botSettings.menuButton}>
-          <select className={inputClass} value={menu.type} onChange={(event) => {
+          <select aria-label={t.botSettings.menuButton} className={inputClass} value={menu.type} onChange={(event) => {
             const type = event.target.value as "commands" | "default" | "webApp";
             setMenuButton(type === "webApp" ? { type, text: "Open app", url: "https://example.com" } : { type });
           }}>
             <option value="commands">{t.botSettings.commandsMenu}</option><option value="default">{t.botSettings.defaultMenu}</option><option value="webApp">{t.botSettings.webAppMenu}</option>
           </select>
         </Field>
-        {menu.type === "webApp" ? <div className="grid grid-cols-2 gap-3"><Field label={t.botSettings.menuText}><input className={inputClass} value={menu.text} onChange={(event) => setMenuButton({ ...menu, text: event.target.value })} /></Field><Field label={t.botSettings.menuUrl} error={!isValidHttpsUrl(menu.url) ? t.botSettings.webAppHttps : undefined}><input className={inputClass} value={menu.url} onChange={(event) => setMenuButton({ ...menu, url: event.target.value })} /></Field></div> : null}
+        {menu.type === "webApp" ? <div className="grid grid-cols-2 gap-3"><Field label={t.botSettings.menuText}><input aria-label={t.botSettings.menuText} className={inputClass} value={menu.text} onChange={(event) => setMenuButton({ ...menu, text: event.target.value })} /></Field><Field label={t.botSettings.menuUrl} error={!isValidHttpsUrl(menu.url) ? t.botSettings.webAppHttps : undefined}><input aria-label={t.botSettings.menuUrl} className={inputClass} value={menu.url} onChange={(event) => setMenuButton({ ...menu, url: event.target.value })} /></Field></div> : null}
       </section>
     </div>
   );
