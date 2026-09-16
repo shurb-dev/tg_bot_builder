@@ -6,9 +6,9 @@ import { AlertTriangle, ImageIcon } from "lucide-react";
 import type { Screen } from "@/domain/project/types";
 
 export function TelegramPreview({ screen, onSelectButton, selectedButtonId }: { screen: Screen; onSelectButton: (rowId: string, buttonId: string) => void; selectedButtonId?: string }) {
-  const [imageFailed, setImageFailed] = useState(false);
+  const [failedMediaUrl, setFailedMediaUrl] = useState<string | null>(null);
   const mediaUrl = screen.message.media?.url ?? "";
-  useEffect(() => setImageFailed(false), [mediaUrl]);
+  const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
 
   return (
     <div className="mx-auto flex h-[620px] w-full max-w-[420px] flex-col overflow-hidden rounded-[30px] border border-slate-700 bg-[#0d1822] shadow-2xl shadow-black/30">
@@ -25,7 +25,8 @@ export function TelegramPreview({ screen, onSelectButton, selectedButtonId }: { 
             <div className="mb-2 overflow-hidden rounded-xl bg-slate-900">
               {!imageFailed ? (
                 <Image
-                  src={screen.message.media.url}
+                  key={mediaUrl}
+                  src={mediaUrl}
                   alt="Message media preview"
                   width={720}
                   height={480}
