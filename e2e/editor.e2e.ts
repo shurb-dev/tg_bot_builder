@@ -63,7 +63,7 @@ test("mandatory MVP browser smoke scenario", async ({ page }, testInfo) => {
   const response = await page.goto("/", { waitUntil: "networkidle" });
   expect(response?.ok()).toBeTruthy();
   await expect(page).toHaveURL(/\/editor$/);
-  await expect(page.getByText("Добро пожаловать!", { exact: false })).toBeVisible();
+  await expect(page.getByRole("main").getByText("Добро пожаловать!", { exact: false })).toBeVisible();
 
   // 3-4. Create Products and set message text.
   await page.getByRole("button", { name: "Add screen", exact: true }).click();
