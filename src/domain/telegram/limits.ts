@@ -1,0 +1,4 @@
+export const TELEGRAM_CALLBACK_DATA_MIN_BYTES = 1;
+export const TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64;
+
+export const GENERATED_CALLBACK_PREFIX = "__tflow:";
