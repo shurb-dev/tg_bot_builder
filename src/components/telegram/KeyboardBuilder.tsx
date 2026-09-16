@@ -9,7 +9,6 @@ import {
   useSensors,
   type DragEndEvent,
   type DragOverEvent,
-  type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -74,7 +73,7 @@ export function KeyboardBuilder({ screenId, keyboard, selectedButtonId }: { scre
   const renderedKeyboard = dragging ? draft : keyboard;
   const rowIds = useMemo(() => renderedKeyboard.map((row) => row.id), [renderedKeyboard]);
 
-  function onDragStart(_: DragStartEvent) {
+  function onDragStart() {
     const initial = cloneKeyboard(keyboard);
     draftRef.current = initial;
     setDraft(initial);
