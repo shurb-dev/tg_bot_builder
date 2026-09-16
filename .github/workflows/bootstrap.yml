@@ -1,0 +1,45 @@
+name: Bootstrap source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - bootstrap.tar.gz.b64
+      - .github/workflows/bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Unpack source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/tflow-bootstrap
+          mkdir -p /tmp/tflow-bootstrap
+          base64 --decode bootstrap.tar.gz.b64 > /tmp/tflow.tar.gz
+          tar -xzf /tmp/tflow.tar.gz -C /tmp/tflow-bootstrap
+          rsync -a --delete --exclude='.git/' /tmp/tflow-bootstrap/ ./
+          rm -f bootstrap.tar.gz.b64 .github/workflows/bootstrap.yml
+
+      - name: Commit unpacked source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "feat: bootstrap TFlow MVP source"
+          git push origin HEAD:main
