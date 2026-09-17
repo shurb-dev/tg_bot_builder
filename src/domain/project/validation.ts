@@ -1,7 +1,7 @@
 import type { FlowTarget, LogicNode, Project } from "./types";
 import { utf8ByteLength } from "../telegram/utf8";
 import { GENERATED_CALLBACK_PREFIX, TELEGRAM_CALLBACK_DATA_MAX_BYTES, TELEGRAM_CALLBACK_DATA_MIN_BYTES } from "../telegram/limits";
-import { targetExists } from "./selectors";
+import { deriveFlowEdges, targetExists } from "./selectors";
 
 export type ValidationSeverity = "error" | "warning";
 export type ValidationButtonKind = "inline" | "reply";
@@ -48,6 +48,26 @@ function validateTemplate(value: string, project: Project, issues: ValidationIss
 function targetRequired(target: FlowTarget | null, project: Project, issues: ValidationIssue[], code: string, node: LogicNode): void {
   if (!target) issues.push(issue("error", code, { node: node.name || node.type }, undefined, undefined, undefined, node.id));
   else if (!targetExists(project, target)) issues.push(issue("error", "MISSING_FLOW_TARGET", { node: node.name || node.type }, undefined, undefined, undefined, node.id));
+}
+
+function validateReachability(project: Project, issues: ValidationIssue[]): void {
+  const adjacency = new Map<string, string[]>();
+  for (const edge of deriveFlowEdges(project)) adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target]);
+  const roots = project.screens.filter((screen) => screen.trigger).map((screen) => screen.id);
+  if (roots.length === 0 && project.screens[0]) roots.push(project.screens[0].id);
+  const visited = new Set<string>(roots);
+  const stack = [...roots];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    for (const target of adjacency.get(current) ?? []) {
+      if (visited.has(target)) continue;
+      visited.add(target);
+      stack.push(target);
+    }
+  }
+  for (const screen of project.screens) {
+    if (!screen.trigger && !visited.has(screen.id)) issues.push(issue("warning", "UNREACHABLE_SCREEN", { screen: screen.name.trim() || "Unnamed screen" }, screen.id));
+  }
 }
 
 export function validateProject(project: Project): ValidationIssue[] {
@@ -154,7 +174,7 @@ export function validateProject(project: Project): ValidationIssue[] {
       if (node.rules.length === 0) issues.push(issue("error", "EMPTY_CONDITION", { node: nodeName }, undefined, undefined, undefined, node.id));
       for (const rule of node.rules) {
         if (!rule.left.trim()) issues.push(issue("error", "EMPTY_CONDITION_OPERAND", { node: nodeName }, undefined, undefined, undefined, node.id));
-        if (!['exists','notExists'].includes(rule.operator) && !rule.right.trim()) issues.push(issue("error", "EMPTY_CONDITION_OPERAND", { node: nodeName }, undefined, undefined, undefined, node.id));
+        if (!["exists", "notExists"].includes(rule.operator) && !rule.right.trim()) issues.push(issue("error", "EMPTY_CONDITION_OPERAND", { node: nodeName }, undefined, undefined, undefined, node.id));
         validateTemplate(rule.left, project, issues, nodeName, node.id); validateTemplate(rule.right, project, issues, nodeName, node.id);
       }
       targetRequired(node.trueTarget, project, issues, "MISSING_TRUE_TARGET", node); targetRequired(node.falseTarget, project, issues, "MISSING_FALSE_TARGET", node);
@@ -166,7 +186,7 @@ export function validateProject(project: Project): ValidationIssue[] {
       if (!isValidHttpUrl(node.url) && !node.url.includes("{{")) issues.push(issue("error", "INVALID_HTTP_URL", { node: nodeName }, undefined, undefined, undefined, node.id));
       if (!VARIABLE_KEY.test(node.resultKey)) issues.push(issue("error", "INVALID_HTTP_RESULT_KEY", { key: node.resultKey }, undefined, undefined, undefined, node.id));
       if (node.timeoutMs < 100 || node.timeoutMs > 120000) issues.push(issue("error", "INVALID_HTTP_TIMEOUT", { node: nodeName }, undefined, undefined, undefined, node.id));
-      if (node.body.type === "json") { try { JSON.parse(node.body.value.replace(TEMPLATE, '"x"')); } catch { issues.push(issue("error", "INVALID_HTTP_JSON", { node: nodeName }, undefined, undefined, undefined, node.id)); } }
+      if (node.body.type === "json") { try { JSON.parse(node.body.value.replace(TEMPLATE, "0")); } catch { issues.push(issue("error", "INVALID_HTTP_JSON", { node: nodeName }, undefined, undefined, undefined, node.id)); } }
       if (node.mock.status < 100 || node.mock.status > 599) issues.push(issue("error", "INVALID_HTTP_MOCK_STATUS", { node: nodeName }, undefined, undefined, undefined, node.id));
       validateTemplate(node.url, project, issues, nodeName, node.id); node.headers.forEach((item) => { validateTemplate(item.key, project, issues, nodeName, node.id); validateTemplate(item.value, project, issues, nodeName, node.id); });
       node.query.forEach((item) => { validateTemplate(item.key, project, issues, nodeName, node.id); validateTemplate(item.value, project, issues, nodeName, node.id); });
@@ -182,6 +202,7 @@ export function validateProject(project: Project): ValidationIssue[] {
   project.logicNodes.filter((node): node is Extract<LogicNode, { type: "http" }> => node.type === "http").forEach((node) => httpKeys.set(node.resultKey, (httpKeys.get(node.resultKey) ?? 0) + 1));
   for (const [key, count] of httpKeys) if (count > 1) issues.push(issue("error", "DUPLICATE_HTTP_RESULT_KEY", { key }));
 
+  validateReachability(project, issues);
   return issues;
 }
 
