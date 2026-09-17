@@ -74,7 +74,7 @@ function parseVariableValue(raw: string, variable: ProjectVariable | undefined):
 }
 
 export async function runSimulation(project: Project, state: SimulationState, adapter: HttpAdapter = browserHttpAdapter): Promise<SimulationState> {
-  let next = structuredClone(state);
+  const next = structuredClone(state);
   next.status = "running";
   next.error = null;
   for (let autoSteps = 0; autoSteps < MAX_AUTO_STEPS; autoSteps += 1) {
