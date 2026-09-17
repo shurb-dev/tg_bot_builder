@@ -1,11 +1,28 @@
 export type Project = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
+  botSettings: BotSettings;
   screens: Screen[];
 };
+
+export type BotSettings = {
+  commands: BotCommand[];
+  menuButton: BotMenuButton;
+};
+
+export type BotCommand = {
+  id: string;
+  command: string;
+  description: string;
+};
+
+export type BotMenuButton =
+  | { type: "commands" }
+  | { type: "default" }
+  | { type: "webApp"; text: string; url: string };
 
 export type ScreenTrigger = {
   type: "command";
@@ -28,11 +45,12 @@ export type Screen = {
   name: string;
   trigger: ScreenTrigger | null;
   message: TelegramMessage;
-  keyboard: KeyboardRow[];
+  inlineKeyboard: InlineKeyboardRow[];
+  replyKeyboard: ReplyKeyboardState;
   editor: { flowPosition: FlowPosition };
 };
 
-export type KeyboardRow = {
+export type InlineKeyboardRow = {
   id: string;
   buttons: InlineButton[];
 };
@@ -48,9 +66,46 @@ export type InlineButton = {
   action: ButtonAction;
 };
 
+export type ReplyKeyboardState =
+  | { mode: "inherit" }
+  | { mode: "remove" }
+  | { mode: "show"; config: ReplyKeyboardConfig };
+
+export type ReplyKeyboardConfig = {
+  rows: ReplyKeyboardRow[];
+  resizeKeyboard: boolean;
+  oneTimeKeyboard: boolean;
+  isPersistent: boolean;
+  selective: boolean;
+  inputFieldPlaceholder: string | null;
+};
+
+export type ReplyKeyboardRow = {
+  id: string;
+  buttons: ReplyKeyboardButton[];
+};
+
+export type ReplyKeyboardAction =
+  | { type: "screen"; screenId: string }
+  | { type: "text" }
+  | { type: "requestContact" }
+  | { type: "requestLocation" }
+  | { type: "webApp"; url: string };
+
+export type ReplyKeyboardButton = {
+  id: string;
+  text: string;
+  action: ReplyKeyboardAction;
+};
+
 export type EditorMode = "design" | "flow" | "code";
 
 export type EditorSelection =
   | { type: "screen"; screenId: string }
-  | { type: "button"; screenId: string; rowId: string; buttonId: string }
+  | { type: "inlineButton"; screenId: string; rowId: string; buttonId: string }
+  | { type: "replyButton"; screenId: string; rowId: string; buttonId: string }
+  | { type: "botSettings" }
   | null;
+
+// Compatibility aliases for internal modules that still use the older naming.
+export type KeyboardRow = InlineKeyboardRow;
