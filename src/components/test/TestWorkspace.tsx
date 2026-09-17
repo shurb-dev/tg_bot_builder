@@ -150,10 +150,7 @@ export function TestWorkspace() {
             <div className="grid h-10 w-10 place-items-center rounded-full bg-sky-500 text-sm font-bold text-white">
               TF
             </div>
-            <div>
-              <div className="text-sm font-semibold text-white">TFlow Test Bot</div>
-              <div className="text-xs text-sky-300">{t.simulator}</div>
-            </div>
+            <div className="text-sm font-semibold text-white">TFlow Test Bot</div>
           </div>
 
           <div className="telegram-wallpaper flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
