@@ -294,6 +294,5 @@ The generated source never contains a real bot token or persisted integration se
 
 - `AGENTS.md` — repository working agreement
 - `MVP_PLAN.md` — original MVP implementation specification
-- `V1_1_PLAN.md` — V1.1 keyboard/menu/i18n specification
 - `V1_2_PLAN.md` — V1.2 runtime-logic/Test Mode specification and Definition of Done
 - `PROGRESS.md` — current implementation and verification state
