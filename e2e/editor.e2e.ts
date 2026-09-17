@@ -56,7 +56,7 @@ async function extractZip(zipPath: string, targetDir: string): Promise<JSZip> {
   return zip;
 }
 
-test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
+test("mandatory legacy browser smoke on schema v3", async ({ page }, testInfo) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -123,7 +123,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await page.getByTitle("Save now").click();
 
   const configured = await readStoredProject(page);
-  expect(configured.schemaVersion).toBe(2);
+  expect(configured.schemaVersion).toBe(3);
   const products = configured.screens.find((screen) => screen.name === "Products");
   if (!products || products.replyKeyboard.mode !== "show") throw new Error("Products reply keyboard missing");
   expect(products.message.text).toBe("Наши товары");
@@ -177,6 +177,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await page.getByLabel("Application language", { exact: true }).selectOption("ru");
   await expect(page.getByRole("button", { name: "Дизайн", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Сценарий", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Тест", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Дизайн", exact: true }).click();
   await sidebar.getByText("Products", { exact: true }).click();
   await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
@@ -190,6 +191,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
   await page.getByLabel("Язык приложения", { exact: true }).selectOption("en");
   await expect(page.getByRole("button", { name: "Design", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Test", exact: true })).toBeVisible();
   await expect(page.getByTestId("reply-keyboard")).toContainText("Catalog");
 
   // Code mode reflects ReplyKeyboardMarkup, routing, special actions, hide mode and Bot Settings.
@@ -208,7 +210,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await expect(page.locator("pre code")).toContainText("set_my_commands");
   await expect(page.locator("pre code")).toContainText("MenuButtonWebApp");
 
-  // JSON semantic round-trip preserves v2 data and editor metadata.
+  // JSON semantic round-trip preserves v3 data and editor metadata.
   const [jsonDownload] = await Promise.all([page.waitForEvent("download"), page.getByTitle("Export JSON").click()]);
   const jsonPath = await jsonDownload.path();
   if (!jsonPath) throw new Error("JSON download did not produce a file");
@@ -221,6 +223,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   await page.getByTitle("Save now").click();
   const imported = await readStoredProject(page);
   const importedProducts = imported.screens.find((screen) => screen.name === "Products");
+  expect(imported.schemaVersion).toBe(3);
   expect(importedProducts?.replyKeyboard).toEqual(products.replyKeyboard);
   expect(importedProducts?.editor.flowPosition).toEqual(movedPosition);
   expect(imported.screens.find((screen) => screen.name === "Hide Keyboard")?.replyKeyboard).toEqual({ mode: "remove" });
@@ -236,9 +239,13 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   expect(zip.file("generated_bot/keyboards/inline.py")).toBeTruthy();
   expect(zip.file("generated_bot/keyboards/reply.py")).toBeTruthy();
   expect(zip.file("generated_bot/handlers/screens.py")).toBeTruthy();
+  expect(zip.file("generated_bot/runtime/flow.py")).toBeTruthy();
+  expect(zip.file("generated_bot/runtime/http.py")).toBeTruthy();
+  expect(zip.file("generated_bot/states/flow.py")).toBeTruthy();
   const requirements = await zip.file("generated_bot/requirements.txt")?.async("string");
   const envExample = await zip.file("generated_bot/.env.example")?.async("string");
   expect(requirements).toContain("aiogram>=3,<4");
+  expect(requirements).toContain("aiohttp>=3,<4");
   expect(envExample).toContain("BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN");
   const textFiles = await Promise.all(Object.values(zip.files).filter((entry) => !entry.dir).map((entry) => entry.async("string")));
   expect(textFiles.join("\n")).not.toMatch(/\b\d{6,}:[A-Za-z0-9_-]{20,}\b/);
