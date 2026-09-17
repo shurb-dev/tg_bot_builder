@@ -7,6 +7,7 @@ import type { Project } from "../src/domain/project/types";
 
 const STORAGE_KEY = "telegram-bot-visual-builder:project:v1";
 const PREFERENCES_KEY = "telegram-bot-visual-builder:preferences:v1";
+const E2E_INIT_KEY = "telegram-bot-visual-builder:e2e-initialized";
 
 async function pointerDrag(page: Page, source: Locator, target: Locator): Promise<void> {
   const sourceBox = await source.boundingBox();
@@ -59,10 +60,12 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.addInitScript(({ projectKey, preferencesKey }) => {
+  await page.addInitScript(({ projectKey, preferencesKey, initKey }) => {
+    if (window.sessionStorage.getItem(initKey)) return;
     window.localStorage.removeItem(projectKey);
     window.localStorage.setItem(preferencesKey, JSON.stringify({ locale: "en" }));
-  }, { projectKey: STORAGE_KEY, preferencesKey: PREFERENCES_KEY });
+    window.sessionStorage.setItem(initKey, "1");
+  }, { projectKey: STORAGE_KEY, preferencesKey: PREFERENCES_KEY, initKey: E2E_INIT_KEY });
 
   const response = await page.goto("/", { waitUntil: "networkidle" });
   expect(response?.ok()).toBeTruthy();
