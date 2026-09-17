@@ -1,122 +1,94 @@
-import type { Project, Screen } from "../../domain/project/types";
+import type { FlowTarget, Project, Screen } from "../../domain/project/types";
 import { normalizeCommand } from "../../domain/project/validation";
 import { inlineKeyboardFunctionName, replyKeyboardFunctionName } from "./keyboards";
-import { routeForScreen } from "./callbacks";
+import { buildNodeRoutes, routeForNode, routeForScreen } from "./callbacks";
 import { pyString, safePythonIdentifier } from "./templates";
 
-function senderName(screen: Screen): string {
-  return `send_${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}`;
-}
-
-function parseModeArgument(screen: Screen): string {
-  return screen.message.parseMode === "none" ? "None" : pyString(screen.message.parseMode);
-}
-
+function senderName(screen: Screen): string { return `send_${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}`; }
+function parseModeArgument(screen: Screen): string { return screen.message.parseMode === "none" ? "None" : pyString(screen.message.parseMode); }
 function replyMarkup(screen: Screen): string {
   if (screen.replyKeyboard.mode === "show") return `${replyKeyboardFunctionName(screen)}()`;
   if (screen.replyKeyboard.mode === "remove") return "ReplyKeyboardRemove()";
   return `${inlineKeyboardFunctionName(screen)}()`;
 }
-
+function targetLiteral(target: FlowTarget): string {
+  return target.type === "screen"
+    ? `{"type": "screen", "screenId": ${pyString(target.screenId)}}`
+    : `{"type": "node", "nodeId": ${pyString(target.nodeId)}}`;
+}
 function renderSender(screen: Screen): string[] {
-  const lines = [`async def ${senderName(screen)}(message: Message) -> None:`];
-  const text = pyString(screen.message.text);
-  const parseMode = parseModeArgument(screen);
-  const markup = replyMarkup(screen);
+  const lines = [`async def ${senderName(screen)}(message: Message, state: FSMContext) -> None:`, "    context = await load_context(message, state)"];
+  const text = `render(${pyString(screen.message.text)}, context)`;
+  const parseMode = parseModeArgument(screen); const markup = replyMarkup(screen);
   if (screen.message.media?.type === "photo") {
-    lines.push(
-      "    await message.answer_photo(",
-      `        photo=${pyString(screen.message.media.url)},`,
-      `        caption=${text},`,
-      `        parse_mode=${parseMode},`,
-      `        reply_markup=${markup},`,
-      "    )",
-    );
+    lines.push("    await message.answer_photo(", `        photo=render(${pyString(screen.message.media.url)}, context),`, `        caption=${text},`, `        parse_mode=${parseMode},`, `        reply_markup=${markup},`, "    )");
   } else {
-    lines.push(
-      "    await message.answer(",
-      `        text=${text},`,
-      `        parse_mode=${parseMode},`,
-      `        reply_markup=${markup},`,
-      "    )",
-    );
+    lines.push("    await message.answer(", `        text=${text},`, `        parse_mode=${parseMode},`, `        reply_markup=${markup},`, "    )");
   }
   return lines;
 }
 
-export function generateHandlers(project: Project, routes: Map<string, string>): string {
+export function generateHandlers(project: Project, routes: Map<string, string>, nodeRoutes: Map<string, string> = buildNodeRoutes(project)): string {
   const inlineImports = project.screens.map(inlineKeyboardFunctionName).join(",\n    ");
   const replyScreens = project.screens.filter((screen) => screen.replyKeyboard.mode === "show");
   const replyImports = replyScreens.map(replyKeyboardFunctionName).join(",\n    ");
   const lines: string[] = [
     "from aiogram import F, Router",
     "from aiogram.filters import Command",
+    "from aiogram.fsm.context import FSMContext",
     "from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove",
     "",
+    "from runtime.flow import execute_target, load_context, resume_input",
+    "from runtime.templates import render",
+    "from states.flow import FlowState",
     "from keyboards.inline import (",
     `    ${inlineImports}`,
     ")",
   ];
   if (replyImports) lines.push("from keyboards.reply import (", `    ${replyImports}`, ")");
   lines.push("", "router = Router()", "");
-
   for (const screen of project.screens) lines.push(...renderSender(screen), "");
+
+  lines.push("async def dispatch_target(target: dict | None, message: Message, state: FSMContext) -> None:", "    if not target:", "        return", "    if target.get(\"type\") == \"screen\":", "        screen_id = target.get(\"screenId\")");
+  project.screens.forEach((screen, index) => {
+    lines.push(`${index === 0 ? "        if" : "        elif"} screen_id == ${pyString(screen.id)}:`, `            await ${senderName(screen)}(message, state)`, "            return");
+  });
+  lines.push("        raise RuntimeError(f\"Unknown screen target: {screen_id}\")", "    next_target = await execute_target(target, message, state)", "    if next_target:", "        await dispatch_target(next_target, message, state)", "");
 
   for (const screen of project.screens) {
     if (!screen.trigger) continue;
     const command = normalizeCommand(screen.trigger.command);
-    lines.push(
-      `@router.message(Command(${pyString(command)}))`,
-      `async def command_${safePythonIdentifier(command)}_${screen.id.replace(/-/g, "").slice(0, 6)}(message: Message) -> None:`,
-      `    await ${senderName(screen)}(message)`,
-      "",
-    );
+    lines.push(`@router.message(Command(${pyString(command)}))`, `async def command_${safePythonIdentifier(command)}_${screen.id.replace(/-/g, "").slice(0, 6)}(message: Message, state: FSMContext) -> None:`, `    await ${senderName(screen)}(message, state)`, "");
   }
 
   for (const screen of project.screens) {
     const route = routeForScreen(routes, screen);
-    lines.push(
-      `@router.callback_query(F.data == ${pyString(route)})`,
-      `async def screen_${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}(callback: CallbackQuery) -> None:`,
-      "    await callback.answer()",
-      "    if not isinstance(callback.message, Message):",
-      "        return",
-      `    await ${senderName(screen)}(callback.message)`,
-      "",
-    );
+    lines.push(`@router.callback_query(F.data == ${pyString(route)})`, `async def screen_${safePythonIdentifier(screen.name)}_${screen.id.replace(/-/g, "").slice(0, 6)}(callback: CallbackQuery, state: FSMContext) -> None:`, "    await callback.answer()", "    if not isinstance(callback.message, Message):", "        return", `    await ${senderName(screen)}(callback.message, state)`, "");
   }
+
+  for (const node of project.logicNodes) {
+    const route = routeForNode(nodeRoutes, node);
+    lines.push(`@router.callback_query(F.data == ${pyString(route)})`, `async def node_${safePythonIdentifier(node.name)}_${node.id.replace(/-/g, "").slice(0, 6)}(callback: CallbackQuery, state: FSMContext) -> None:`, "    await callback.answer()", "    if not isinstance(callback.message, Message):", "        return", `    await dispatch_target(${targetLiteral({ type: "node", nodeId: node.id })}, callback.message, state)`, "");
+  }
+
+  lines.push("@router.message(FlowState.waiting_for_input)", "async def flow_input(message: Message, state: FSMContext) -> None:", "    target = await resume_input(message, state)", "    if target:", "        await dispatch_target(target, message, state)", "");
 
   for (const screen of project.screens) {
     if (screen.replyKeyboard.mode !== "show") continue;
-    for (const row of screen.replyKeyboard.config.rows) {
-      for (const button of row.buttons) {
-        const action = button.action;
-        if (action.type !== "screen") continue;
-        const targetScreenId = action.screenId;
-        const target = project.screens.find((candidate) => candidate.id === targetScreenId);
-        if (!target) throw new Error(`Reply button ${button.id} points to missing screen ${targetScreenId}`);
-        lines.push(
-          `@router.message(F.text == ${pyString(button.text)})`,
-          `async def reply_nav_${button.id.replace(/-/g, "").slice(0, 10)}(message: Message) -> None:`,
-          `    await ${senderName(target)}(message)`,
-          "",
-        );
+    for (const row of screen.replyKeyboard.config.rows) for (const button of row.buttons) {
+      const action = button.action;
+      if (action.type === "screen") {
+        const target = project.screens.find((candidate) => candidate.id === action.screenId);
+        if (!target) throw new Error(`Reply button ${button.id} points to missing screen ${action.screenId}`);
+        lines.push(`@router.message(F.text == ${pyString(button.text)})`, `async def reply_nav_${button.id.replace(/-/g, "").slice(0, 10)}(message: Message, state: FSMContext) -> None:`, `    await ${senderName(target)}(message, state)`, "");
+      } else if (action.type === "node") {
+        lines.push(`@router.message(F.text == ${pyString(button.text)})`, `async def reply_node_${button.id.replace(/-/g, "").slice(0, 10)}(message: Message, state: FSMContext) -> None:`, `    await dispatch_target(${targetLiteral({ type: "node", nodeId: action.nodeId })}, message, state)`, "");
       }
     }
   }
 
-  const textActions = [...new Set(project.screens.flatMap((screen) =>
-    screen.replyKeyboard.mode === "show"
-      ? screen.replyKeyboard.config.rows.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "text" ? [button.text] : []))
-      : [],
-  ))].sort();
-  textActions.forEach((text, index) => lines.push(
-    `@router.message(F.text == ${pyString(text)})`,
-    `async def reply_text_${index + 1}(message: Message) -> None:`,
-    "    # TODO: Replace this stub with application-specific logic.",
-    "    await message.answer(\"Action received\")",
-    "",
-  ));
+  const textActions = [...new Set(project.screens.flatMap((screen) => screen.replyKeyboard.mode === "show" ? screen.replyKeyboard.config.rows.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "text" ? [button.text] : [])) : []))].sort();
+  textActions.forEach((text, index) => lines.push(`@router.message(F.text == ${pyString(text)})`, `async def reply_text_${index + 1}(message: Message) -> None:`, "    # TODO: Replace this stub with application-specific logic.", "    await message.answer(\"Action received\")", ""));
 
   const hasContact = project.screens.some((screen) => screen.replyKeyboard.mode === "show" && screen.replyKeyboard.config.rows.some((row) => row.buttons.some((button) => button.action.type === "requestContact")));
   if (hasContact) lines.push("@router.message(F.contact)", "async def received_contact(message: Message) -> None:", "    # TODO: Handle the shared contact.", "    await message.answer(\"Contact received\")", "");
@@ -126,13 +98,6 @@ export function generateHandlers(project: Project, routes: Map<string, string>):
   if (hasWebApp) lines.push("@router.message(F.web_app_data)", "async def received_web_app_data(message: Message) -> None:", "    # TODO: Handle data sent back by the Web App.", "    await message.answer(\"Web App data received\")", "");
 
   const customCallbacks = [...new Set(project.screens.flatMap((screen) => screen.inlineKeyboard.flatMap((row) => row.buttons.flatMap((button) => button.action.type === "callback" ? [button.action.callbackData] : []))))].sort();
-  customCallbacks.forEach((callbackData, index) => lines.push(
-    `@router.callback_query(F.data == ${pyString(callbackData)})`,
-    `async def custom_callback_${index + 1}(callback: CallbackQuery) -> None:`,
-    "    # TODO: Replace this stub with your application-specific business logic.",
-    "    await callback.answer(\"Action received\")",
-    "",
-  ));
-
+  customCallbacks.forEach((callbackData, index) => lines.push(`@router.callback_query(F.data == ${pyString(callbackData)})`, `async def custom_callback_${index + 1}(callback: CallbackQuery) -> None:`, "    # TODO: Replace this stub with your application-specific business logic.", "    await callback.answer(\"Action received\")", ""));
   return `${lines.join("\n").trimEnd()}\n`;
 }

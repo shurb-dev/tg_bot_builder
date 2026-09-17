@@ -4,87 +4,31 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { useTranslations } from "@/i18n/use-translations";
+import { getV12Translations } from "@/i18n/v12-translations";
+import { usePreferencesStore } from "@/store/preferences-store";
 import { useProjectStore } from "@/store/project-store";
 import { isValidHttpsUrl } from "@/domain/project/validation";
+import type { ProjectVariableValue } from "@/domain/project/types";
 
 export function BotSettingsPanel() {
   const t = useTranslations();
+  const locale = usePreferencesStore((state) => state.locale); const v12 = getV12Translations(locale);
   const project = useProjectStore((state) => state.project);
-  const addBotCommand = useProjectStore((state) => state.addBotCommand);
-  const updateBotCommand = useProjectStore((state) => state.updateBotCommand);
-  const deleteBotCommand = useProjectStore((state) => state.deleteBotCommand);
-  const setMenuButton = useProjectStore((state) => state.setMenuButton);
+  const addBotCommand = useProjectStore((state) => state.addBotCommand); const updateBotCommand = useProjectStore((state) => state.updateBotCommand); const deleteBotCommand = useProjectStore((state) => state.deleteBotCommand); const setMenuButton = useProjectStore((state) => state.setMenuButton);
+  const addVariable = useProjectStore((state) => state.addVariable); const updateVariable = useProjectStore((state) => state.updateVariable); const deleteVariable = useProjectStore((state) => state.deleteVariable);
+  const addEnvironmentVariable = useProjectStore((state) => state.addEnvironmentVariable); const updateEnvironmentVariable = useProjectStore((state) => state.updateEnvironmentVariable); const deleteEnvironmentVariable = useProjectStore((state) => state.deleteEnvironmentVariable);
   const menu = project.botSettings.menuButton;
 
-  return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-100">{t.botSettings.title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{t.botSettings.hint}</p>
-      </div>
+  const defaultFor = (type: "string" | "number" | "boolean", raw: string): ProjectVariableValue => type === "number" ? Number(raw || 0) : type === "boolean" ? raw === "true" : raw;
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-200">{t.botSettings.commands}</h3>
-          <Button className="h-8" onClick={addBotCommand}><Plus size={14} />{t.botSettings.addCommand}</Button>
-        </div>
-        <div className="space-y-2">
-          {project.botSettings.commands.map((command) => (
-            <div key={command.id} className="grid grid-cols-[180px_1fr_auto] gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-              <Field label={t.botSettings.command}>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-600">/</span>
-                  <input
-                    aria-label={t.botSettings.command}
-                    className={`${inputClass} pl-6`}
-                    maxLength={32}
-                    value={command.command}
-                    onChange={(event) => updateBotCommand(command.id, { command: event.target.value.replace(/^\/+/, "").toLowerCase() })}
-                  />
-                </div>
-              </Field>
-              <Field label={t.botSettings.description}>
-                <input
-                  aria-label={t.botSettings.description}
-                  className={inputClass}
-                  maxLength={256}
-                  value={command.description}
-                  onChange={(event) => updateBotCommand(command.id, { description: event.target.value })}
-                />
-              </Field>
-              <button className="mt-6 rounded-lg p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => deleteBotCommand(command.id)} aria-label={t.botSettings.deleteCommand} title={t.botSettings.deleteCommand}><Trash2 size={15} /></button>
-            </div>
-          ))}
-        </div>
-      </section>
+  return <div className="mx-auto w-full max-w-4xl space-y-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-6">
+    <div><h2 className="text-lg font-semibold text-slate-100">{t.botSettings.title}</h2><p className="mt-1 text-sm text-slate-500">{t.botSettings.hint}</p></div>
+    <section className="space-y-3"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-200">{t.botSettings.commands}</h3><Button className="h-8" onClick={addBotCommand}><Plus size={14} />{t.botSettings.addCommand}</Button></div><div className="space-y-2">{project.botSettings.commands.map((command) => <div key={command.id} className="grid grid-cols-[180px_1fr_auto] gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3"><Field label={t.botSettings.command}><div className="relative"><span className="absolute left-3 top-2.5 text-slate-600">/</span><input aria-label={t.botSettings.command} className={`${inputClass} pl-6`} maxLength={32} value={command.command} onChange={(event) => updateBotCommand(command.id, { command: event.target.value.replace(/^\/+/, "").toLowerCase() })} /></div></Field><Field label={t.botSettings.description}><input aria-label={t.botSettings.description} className={inputClass} maxLength={256} value={command.description} onChange={(event) => updateBotCommand(command.id, { description: event.target.value })} /></Field><button className="mt-6 rounded-lg p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" onClick={() => deleteBotCommand(command.id)} aria-label={t.botSettings.deleteCommand}><Trash2 size={15} /></button></div>)}</div></section>
 
-      <section className="space-y-4 border-t border-slate-800 pt-5">
-        <Field label={t.botSettings.menuButton}>
-          <select
-            aria-label={t.botSettings.menuButton}
-            className={inputClass}
-            value={menu.type}
-            onChange={(event) => {
-              const type = event.target.value as "commands" | "default" | "webApp";
-              setMenuButton(type === "webApp" ? { type, text: "Open app", url: "https://example.com" } : { type });
-            }}
-          >
-            <option value="commands">{t.botSettings.commandsMenu}</option>
-            <option value="default">{t.botSettings.defaultMenu}</option>
-            <option value="webApp">{t.botSettings.webAppMenu}</option>
-          </select>
-        </Field>
-        {menu.type === "webApp" ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t.botSettings.menuText}>
-              <input aria-label={t.botSettings.menuText} className={inputClass} value={menu.text} onChange={(event) => setMenuButton({ ...menu, text: event.target.value })} />
-            </Field>
-            <Field label={t.botSettings.menuUrl} error={!isValidHttpsUrl(menu.url) ? t.botSettings.webAppHttps : undefined}>
-              <input aria-label={t.botSettings.menuUrl} className={inputClass} value={menu.url} onChange={(event) => setMenuButton({ ...menu, url: event.target.value })} />
-            </Field>
-          </div>
-        ) : null}
-      </section>
-    </div>
-  );
+    <section className="space-y-4 border-t border-slate-800 pt-5"><Field label={t.botSettings.menuButton}><select aria-label={t.botSettings.menuButton} className={inputClass} value={menu.type} onChange={(event) => { const type = event.target.value as "commands" | "default" | "webApp"; setMenuButton(type === "webApp" ? { type, text: "Open app", url: "https://example.com" } : { type }); }}><option value="commands">{t.botSettings.commandsMenu}</option><option value="default">{t.botSettings.defaultMenu}</option><option value="webApp">{t.botSettings.webAppMenu}</option></select></Field>{menu.type === "webApp" ? <div className="grid grid-cols-2 gap-3"><Field label={t.botSettings.menuText}><input aria-label={t.botSettings.menuText} className={inputClass} value={menu.text} onChange={(event) => setMenuButton({ ...menu, text: event.target.value })} /></Field><Field label={t.botSettings.menuUrl} error={!isValidHttpsUrl(menu.url) ? t.botSettings.webAppHttps : undefined}><input aria-label={t.botSettings.menuUrl} className={inputClass} value={menu.url} onChange={(event) => setMenuButton({ ...menu, url: event.target.value })} /></Field></div> : null}</section>
+
+    <section className="space-y-3 border-t border-slate-800 pt-5"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold text-slate-200">{v12.variables}</h3><p className="text-xs text-slate-500">{v12.variablesHint}</p></div><Button className="h-8" onClick={addVariable}><Plus size={14} />{v12.addVariable}</Button></div><div className="space-y-2">{project.variables.map((variable) => <div key={variable.id} className="grid grid-cols-[1fr_130px_1fr_auto] gap-2 rounded-xl border border-slate-800 p-3"><Field label={v12.key}><input aria-label={`${v12.key} ${variable.id}`} className={inputClass} value={variable.key} onChange={(event) => updateVariable(variable.id, { key: event.target.value })} /></Field><Field label={v12.type}><select aria-label={`${v12.type} ${variable.id}`} className={inputClass} value={variable.type} onChange={(event) => updateVariable(variable.id, { type: event.target.value as typeof variable.type })}><option value="string">string</option><option value="number">number</option><option value="boolean">boolean</option></select></Field><Field label={v12.defaultValue}>{variable.type === "boolean" ? <select aria-label={`${v12.defaultValue} ${variable.id}`} className={inputClass} value={String(variable.defaultValue ?? false)} onChange={(event) => updateVariable(variable.id, { defaultValue: event.target.value === "true" })}><option value="false">false</option><option value="true">true</option></select> : <input aria-label={`${v12.defaultValue} ${variable.id}`} type={variable.type === "number" ? "number" : "text"} className={inputClass} value={String(variable.defaultValue ?? "")} onChange={(event) => updateVariable(variable.id, { defaultValue: defaultFor(variable.type, event.target.value) })} />}</Field><button aria-label={v12.deleteVariable} className="mt-6 p-2 text-rose-300" onClick={() => deleteVariable(variable.id)}><Trash2 size={14} /></button></div>)}</div></section>
+
+    <section className="space-y-3 border-t border-slate-800 pt-5"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold text-slate-200">{v12.env}</h3><p className="text-xs text-slate-500">{v12.envHint}</p></div><Button className="h-8" onClick={addEnvironmentVariable}><Plus size={14} />{v12.addEnv}</Button></div>{project.environmentVariables.map((env) => <div key={env.id} className="flex gap-2"><input aria-label={`${v12.env} ${env.id}`} className={inputClass} value={env.key} onChange={(event) => updateEnvironmentVariable(env.id, { key: event.target.value.toUpperCase() })} /><button aria-label={v12.deleteEnv} className="p-2 text-rose-300" onClick={() => deleteEnvironmentVariable(env.id)}><Trash2 size={14} /></button></div>)}</section>
+  </div>;
 }
