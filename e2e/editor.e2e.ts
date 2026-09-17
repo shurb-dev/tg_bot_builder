@@ -130,15 +130,6 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Location")?.action).toEqual({ type: "requestLocation" });
   expect(products.replyKeyboard.config.rows[1]?.buttons.find((button) => button.text === "Web App")?.action).toEqual({ type: "webApp", url: "https://example.com/app" });
 
-  // Hide keyboard mode is exposed and persisted on its own screen.
-  await page.getByRole("button", { name: "Add screen", exact: true }).click();
-  await page.getByLabel("Screen name", { exact: true }).fill("Hide Keyboard");
-  await page.getByLabel("Message text", { exact: true }).fill("Keyboard removed");
-  await page.getByRole("button", { name: "Bottom keyboard", exact: true }).click();
-  await page.getByLabel("Bottom keyboard mode", { exact: true }).selectOption("remove");
-  await page.getByTitle("Save now").click();
-  expect((await readStoredProject(page)).screens.find((screen) => screen.name === "Hide Keyboard")?.replyKeyboard).toEqual({ mode: "remove" });
-
   // Bot Commands and Telegram chat Menu Button.
   await page.getByRole("button", { name: "Bot settings", exact: true }).click();
   await page.getByRole("button", { name: "Add command", exact: true }).click();
@@ -152,7 +143,7 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   expect(botSettingsProject.botSettings.commands.some((command) => command.command === "help" && command.description === "Help command")).toBe(true);
   expect(botSettingsProject.botSettings.menuButton).toEqual({ type: "webApp", text: "Open Shop", url: "https://example.com/shop" });
 
-  // Reply navigation is projected into Flow and node positions persist.
+  // Reply navigation is projected into Flow and node positions persist. Products is still the top-most newly-created node here.
   await page.getByRole("button", { name: "Flow", exact: true }).click();
   await expect(page.locator(".react-flow")).toBeVisible();
   expect(await page.locator(".react-flow__edge").count()).toBe(7);
@@ -168,6 +159,16 @@ test("mandatory V1.1 browser smoke scenario", async ({ page }, testInfo) => {
   const movedPosition = afterMove.screens.find((screen) => screen.name === "Products")?.editor.flowPosition;
   expect(movedPosition).toBeTruthy();
   expect(movedPosition).not.toEqual(products.editor.flowPosition);
+
+  // Hide keyboard mode is exposed and persisted on its own screen after the Flow drag verification.
+  await page.getByRole("button", { name: "Design", exact: true }).click();
+  await page.getByRole("button", { name: "Add screen", exact: true }).click();
+  await page.getByLabel("Screen name", { exact: true }).fill("Hide Keyboard");
+  await page.getByLabel("Message text", { exact: true }).fill("Keyboard removed");
+  await page.getByRole("button", { name: "Bottom keyboard", exact: true }).click();
+  await page.getByLabel("Bottom keyboard mode", { exact: true }).selectOption("remove");
+  await page.getByTitle("Save now").click();
+  expect((await readStoredProject(page)).screens.find((screen) => screen.name === "Hide Keyboard")?.replyKeyboard).toEqual({ mode: "remove" });
 
   // RU/EN application i18n changes live, persists, and never translates project content.
   await page.getByLabel("Application language", { exact: true }).selectOption("ru");
