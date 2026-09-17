@@ -25,13 +25,11 @@ async function pointerDrag(page: Page, source: Locator, target: Locator): Promis
 }
 
 async function selectInlineBuilderButton(page: Page, label: string): Promise<void> {
-  const handle = page.getByRole("button", { name: `Drag ${label}`, exact: true });
-  await handle.locator("..").locator("button").nth(1).click();
+  await page.getByTestId("inline-keyboard").getByRole("button", { name: label, exact: true }).click();
 }
 
 async function selectReplyBuilderButton(page: Page, label: string): Promise<void> {
-  const handle = page.getByRole("button", { name: `Drag reply ${label}`, exact: true });
-  await handle.locator("..").locator("button").nth(1).click();
+  await page.getByTestId("reply-keyboard").getByRole("button", { name: label, exact: true }).click();
 }
 
 async function readStoredProject(page: Page): Promise<Project> {
