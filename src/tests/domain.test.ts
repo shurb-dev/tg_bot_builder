@@ -49,8 +49,11 @@ describe("telegram domain v2", () => {
   });
 
   it("moves inline buttons and rows without duplication", () => {
-    const a = createButton("A"); const b = createButton("B"); const c = createButton("C");
-    const r1 = createRow([a, b, c]); const r2 = createRow([]);
+    const a = createButton("A");
+    const b = createButton("B");
+    const c = createButton("C");
+    const r1 = createRow([a, b, c]);
+    const r2 = createRow([]);
     expect(moveButtonInKeyboard([r1], a.id, r1.id, 3)[0].buttons.map((button) => button.text)).toEqual(["B", "C", "A"]);
     const moved = moveButtonInKeyboard([r1, r2], a.id, r2.id, 0);
     expect(moved[0].buttons.map((button) => button.text)).toEqual(["B", "C"]);
@@ -59,8 +62,11 @@ describe("telegram domain v2", () => {
   });
 
   it("moves reply buttons within and across rows without duplication", () => {
-    const a = createReplyButton("A"); const b = createReplyButton("B"); const c = createReplyButton("C");
-    const r1 = createReplyRow([a, b, c]); const r2 = createReplyRow([]);
+    const a = createReplyButton("A");
+    const b = createReplyButton("B");
+    const c = createReplyButton("C");
+    const r1 = createReplyRow([a, b, c]);
+    const r2 = createReplyRow([]);
     expect(moveReplyButton([r1], a.id, r1.id, 3)[0].buttons.map((button) => button.text)).toEqual(["B", "C", "A"]);
     const moved = moveReplyButton([r1, r2], b.id, r2.id, 0);
     expect(moved[0].buttons.map((button) => button.text)).toEqual(["A", "C"]);
@@ -87,16 +93,16 @@ describe("telegram domain v2", () => {
     expect(issues.filter((item) => item.code === "DUPLICATE_REPLY_NAV_TEXT")).toHaveLength(2);
   });
 
-  it("rejects ambiguous reply navigation and text handlers", () => {
+  it("rejects ambiguous screen and text reply routes with the same label", () => {
     const project = createDemoProject();
     const main = project.screens[0];
     const catalog = project.screens[1];
     main.inlineKeyboard = [];
     main.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
-    main.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Catalog", { type: "screen", screenId: catalog.id })])];
+    main.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Same", { type: "screen", screenId: catalog.id })])];
     catalog.inlineKeyboard = [];
     catalog.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
-    catalog.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Catalog", { type: "text" })])];
+    catalog.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Same", { type: "text" })])];
     expect(validateProject(project).filter((item) => item.code === "DUPLICATE_REPLY_NAV_TEXT")).toHaveLength(2);
   });
 
@@ -118,6 +124,29 @@ describe("telegram domain v2", () => {
     const project = createDemoProject();
     project.screens[0].replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
     expect(validateProject(project).some((item) => item.code === "INLINE_REPLY_CONFLICT")).toBe(true);
+  });
+
+  it("validates Telegram bottom keyboard placeholder length", () => {
+    const project = createDemoProject();
+    const screen = project.screens[0];
+    screen.inlineKeyboard = [];
+    screen.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
+    screen.replyKeyboard.config.rows = [createReplyRow([createReplyButton("A")])];
+    screen.replyKeyboard.config.inputFieldPlaceholder = "x".repeat(65);
+    expect(validateProject(project).some((item) => item.code === "INVALID_REPLY_PLACEHOLDER")).toBe(true);
+    screen.replyKeyboard.config.inputFieldPlaceholder = "🔥".repeat(64);
+    expect(validateProject(project).some((item) => item.code === "INVALID_REPLY_PLACEHOLDER")).toBe(false);
+  });
+
+  it("requires lowercase Telegram BotCommand names and valid descriptions", () => {
+    const project = createDemoProject();
+    project.botSettings.commands.push({ id: crypto.randomUUID(), command: "Help", description: "Help" });
+    expect(validateProject(project).some((item) => item.code === "INVALID_BOT_COMMAND")).toBe(true);
+    project.botSettings.commands[1].command = "help";
+    project.botSettings.commands[1].description = "";
+    const issues = validateProject(project);
+    expect(issues.some((item) => item.code === "INVALID_BOT_COMMAND")).toBe(false);
+    expect(issues.some((item) => item.code === "INVALID_BOT_COMMAND_DESCRIPTION")).toBe(true);
   });
 
   it("derives flow edges from inline and reply screen actions", () => {
