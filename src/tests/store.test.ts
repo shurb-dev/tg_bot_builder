@@ -46,6 +46,35 @@ describe("project store v2", () => {
     expect(stateAfterUndo.mode).toBe("show");
   });
 
+  it("records one reply drag replacement as one undo step", () => {
+    const screenId = useProjectStore.getState().project.screens[0].id;
+    useProjectStore.getState().setReplyKeyboardMode(screenId, "show");
+    useProjectStore.getState().addReplyButton(screenId);
+    useProjectStore.getState().addReplyButton(screenId);
+    useProjectStore.getState().addReplyRow(screenId);
+
+    const screenBefore = useProjectStore.getState().project.screens[0];
+    if (screenBefore.replyKeyboard.mode !== "show") throw new Error("Reply keyboard was not enabled");
+    const beforeRows = structuredClone(screenBefore.replyKeyboard.config.rows);
+    const firstRow = beforeRows[0];
+    const secondRow = beforeRows[1];
+    const moved = firstRow?.buttons[0];
+    if (!firstRow || !secondRow || !moved) throw new Error("Reply drag fixture is incomplete");
+
+    const afterRows = [
+      { ...firstRow, buttons: firstRow.buttons.slice(1) },
+      { ...secondRow, buttons: [...secondRow.buttons, moved] },
+    ];
+    const historyBefore = useProjectStore.getState().past.length;
+    useProjectStore.getState().replaceReplyKeyboardRows(screenId, afterRows, `reply-drag:${screenId}`);
+    expect(useProjectStore.getState().past).toHaveLength(historyBefore + 1);
+
+    useProjectStore.getState().undo();
+    const restored = useProjectStore.getState().project.screens[0].replyKeyboard;
+    if (restored.mode !== "show") throw new Error("Reply keyboard disappeared after undo");
+    expect(restored.config.rows).toEqual(beforeRows);
+  });
+
   it("keeps selection coherent after undo removes a newly-created screen", () => {
     const originalId = useProjectStore.getState().project.screens[0].id;
     useProjectStore.getState().createScreen();

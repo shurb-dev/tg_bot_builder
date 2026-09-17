@@ -19,13 +19,13 @@ describe("aiogram generator v1.1", () => {
     expect(one.files.find((file) => file.path.endsWith(".env.example"))!.content).not.toMatch(/\d+:[A-Za-z0-9_-]{20,}/);
   });
 
-  it("generates reply keyboard navigation, special buttons, remove markup and bot settings", () => {
+  it("generates reply keyboard navigation, text actions, special buttons, remove markup and bot settings", () => {
     const project = createDemoProject();
     const main = project.screens[0]; const catalog = project.screens[1]; const profile = project.screens[2]; const support = project.screens[3];
     main.inlineKeyboard = [];
     main.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
     main.replyKeyboard.config.rows = [
-      createReplyRow([createReplyButton("Catalog", { type: "screen", screenId: catalog.id }), createReplyButton("Phone", { type: "requestContact" })]),
+      createReplyRow([createReplyButton("Catalog", { type: "screen", screenId: catalog.id }), createReplyButton("Echo", { type: "text" }), createReplyButton("Phone", { type: "requestContact" })]),
       createReplyRow([createReplyButton("Location", { type: "requestLocation" }), createReplyButton("App", { type: "webApp", url: "https://example.com/app" })]),
     ];
     catalog.inlineKeyboard = [];
@@ -44,6 +44,8 @@ describe("aiogram generator v1.1", () => {
     expect(reply).toContain("request_location=True");
     expect(reply).toContain("WebAppInfo");
     expect(handlers).toContain('F.text == "Catalog"');
+    expect(handlers).toContain('F.text == "Echo"');
+    expect(handlers).toContain("reply_text_1");
     expect(handlers).toContain("ReplyKeyboardRemove()");
     expect(handlers).toContain("F.contact");
     expect(handlers).toContain("F.location");
