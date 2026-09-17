@@ -2,10 +2,19 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createDemoProject } from "@/domain/project/defaults";
 import { useProjectStore } from "@/store/project-store";
 
-describe("project store v2", () => {
+describe("project store v3", () => {
   beforeEach(() => {
     const project = createDemoProject();
-    useProjectStore.setState({ project, selectedScreenId: project.screens[0].id, selection: { type: "screen", screenId: project.screens[0].id }, past: [], future: [], lastHistoryKey: null, lastHistoryAt: 0 });
+    useProjectStore.setState({
+      project,
+      mode: "design",
+      selectedScreenId: project.screens[0].id,
+      selection: { type: "screen", screenId: project.screens[0].id },
+      past: [],
+      future: [],
+      lastHistoryKey: null,
+      lastHistoryAt: 0,
+    });
   });
 
   it("creates, duplicates and deletes screens", () => {
@@ -100,5 +109,99 @@ describe("project store v2", () => {
     expect(useProjectStore.getState().project.name).toBe(originalName);
     useProjectStore.getState().redo();
     expect(useProjectStore.getState().project.name).toBe("Changed Name");
+  });
+
+  it("undoes and redoes V1.2 logic connections and node movement", () => {
+    useProjectStore.getState().createLogicNode("sendMessage");
+    const selection = useProjectStore.getState().selection;
+    if (!selection || selection.type !== "logicNode") throw new Error("Logic node was not selected");
+    const nodeId = selection.nodeId;
+    const targetScreenId = useProjectStore.getState().project.screens[1].id;
+    const created = useProjectStore.getState().project.logicNodes.find((node) => node.id === nodeId);
+    if (!created || created.type !== "sendMessage") throw new Error("Send Message node was not created");
+    const originalPosition = structuredClone(created.editor.flowPosition);
+
+    useProjectStore.getState().setLogicNodeTarget(nodeId, "next", { type: "screen", screenId: targetScreenId });
+    useProjectStore.getState().setLogicNodePosition(nodeId, { x: 777, y: 444 });
+
+    let node = useProjectStore.getState().project.logicNodes.find((item) => item.id === nodeId);
+    if (!node || node.type !== "sendMessage") throw new Error("Send Message node disappeared");
+    expect(node.next).toEqual({ type: "screen", screenId: targetScreenId });
+    expect(node.editor.flowPosition).toEqual({ x: 777, y: 444 });
+
+    useProjectStore.getState().undo();
+    node = useProjectStore.getState().project.logicNodes.find((item) => item.id === nodeId);
+    if (!node || node.type !== "sendMessage") throw new Error("Send Message node disappeared after undo");
+    expect(node.editor.flowPosition).toEqual(originalPosition);
+    expect(node.next).toEqual({ type: "screen", screenId: targetScreenId });
+
+    useProjectStore.getState().undo();
+    node = useProjectStore.getState().project.logicNodes.find((item) => item.id === nodeId);
+    if (!node || node.type !== "sendMessage") throw new Error("Send Message node disappeared after second undo");
+    expect(node.next).toBeNull();
+
+    useProjectStore.getState().redo();
+    useProjectStore.getState().redo();
+    node = useProjectStore.getState().project.logicNodes.find((item) => item.id === nodeId);
+    if (!node || node.type !== "sendMessage") throw new Error("Send Message node disappeared after redo");
+    expect(node.next).toEqual({ type: "screen", screenId: targetScreenId });
+    expect(node.editor.flowPosition).toEqual({ x: 777, y: 444 });
+  });
+
+  it("reconciles references when a logic node is deleted and restores them on undo", () => {
+    useProjectStore.getState().createLogicNode("condition");
+    const conditionSelection = useProjectStore.getState().selection;
+    if (!conditionSelection || conditionSelection.type !== "logicNode") throw new Error("Condition node was not selected");
+    const conditionId = conditionSelection.nodeId;
+
+    useProjectStore.getState().createLogicNode("sendMessage");
+    const sendSelection = useProjectStore.getState().selection;
+    if (!sendSelection || sendSelection.type !== "logicNode") throw new Error("Send node was not selected");
+    const sendId = sendSelection.nodeId;
+
+    const project = useProjectStore.getState().project;
+    const main = project.screens[0];
+    const row = main.inlineKeyboard[0];
+    const button = row.buttons[0];
+    useProjectStore.getState().setLogicNodeTarget(conditionId, "true", { type: "node", nodeId: sendId });
+    useProjectStore.getState().setLogicNodeTarget(conditionId, "false", { type: "screen", screenId: project.screens[2].id });
+    useProjectStore.getState().setButtonAction(main.id, row.id, button.id, { type: "node", nodeId: sendId });
+
+    useProjectStore.getState().deleteLogicNode(sendId);
+    expect(useProjectStore.getState().project.logicNodes.some((node) => node.id === sendId)).toBe(false);
+    let condition = useProjectStore.getState().project.logicNodes.find((node) => node.id === conditionId);
+    if (!condition || condition.type !== "condition") throw new Error("Condition node disappeared");
+    expect(condition.trueTarget).toBeNull();
+    const deletedTargetButton = useProjectStore.getState().project.screens[0].inlineKeyboard[0].buttons[0];
+    expect(deletedTargetButton.action).toEqual({ type: "callback", callbackData: "action" });
+
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.logicNodes.some((node) => node.id === sendId)).toBe(true);
+    condition = useProjectStore.getState().project.logicNodes.find((node) => node.id === conditionId);
+    if (!condition || condition.type !== "condition") throw new Error("Condition node disappeared after undo");
+    expect(condition.trueTarget).toEqual({ type: "node", nodeId: sendId });
+    const restoredButton = useProjectStore.getState().project.screens[0].inlineKeyboard[0].buttons[0];
+    expect(restoredButton.action).toEqual({ type: "node", nodeId: sendId });
+  });
+
+  it("clears logic targets when a target screen is deleted and restores them on undo", () => {
+    useProjectStore.getState().createLogicNode("condition");
+    const selection = useProjectStore.getState().selection;
+    if (!selection || selection.type !== "logicNode") throw new Error("Condition node was not selected");
+    const conditionId = selection.nodeId;
+    const targetScreenId = useProjectStore.getState().project.screens[1].id;
+    useProjectStore.getState().setLogicNodeTarget(conditionId, "true", { type: "screen", screenId: targetScreenId });
+    useProjectStore.getState().setLogicNodeTarget(conditionId, "false", { type: "screen", screenId: useProjectStore.getState().project.screens[2].id });
+
+    useProjectStore.getState().deleteScreen(targetScreenId);
+    let condition = useProjectStore.getState().project.logicNodes.find((node) => node.id === conditionId);
+    if (!condition || condition.type !== "condition") throw new Error("Condition node disappeared");
+    expect(condition.trueTarget).toBeNull();
+
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.screens.some((screen) => screen.id === targetScreenId)).toBe(true);
+    condition = useProjectStore.getState().project.logicNodes.find((node) => node.id === conditionId);
+    if (!condition || condition.type !== "condition") throw new Error("Condition node disappeared after undo");
+    expect(condition.trueTarget).toEqual({ type: "screen", screenId: targetScreenId });
   });
 });

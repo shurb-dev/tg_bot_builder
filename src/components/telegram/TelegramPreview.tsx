@@ -20,7 +20,7 @@ function replyIcon(button: ReplyKeyboardButton) {
 }
 
 function inlineButtonTitle(button: Screen["inlineKeyboard"][number]["buttons"][number]) {
-  if (button.action.type === "screen") return button.text;
+  if (button.action.type === "screen" || button.action.type === "node") return button.text;
   if (button.action.type === "url") return button.action.url;
   return button.action.callbackData;
 }

@@ -2,7 +2,7 @@ import type { ValidationIssue } from "@/domain/project/validation";
 import type { AppLocale } from "./translations";
 import { formatTemplate } from "./translations";
 
-const messages: Record<AppLocale, Record<string, string>> = {
+export const validationMessages: Record<AppLocale, Record<string, string>> = {
   en: {
     NO_SCREENS: "Project must contain at least one screen.",
     INVALID_COMMAND: "Screen “{screen}” has an invalid command trigger.",
@@ -11,6 +11,7 @@ const messages: Record<AppLocale, Record<string, string>> = {
     NO_BUTTONS: "Screen “{screen}” has no buttons.",
     EMPTY_BUTTON_TEXT: "An inline button on “{screen}” has no text.",
     MISSING_SCREEN_TARGET: "Button “{button}” points to a missing screen.",
+    MISSING_NODE_TARGET: "Button “{button}” points to a missing logic node.",
     INVALID_CALLBACK_LENGTH: "Callback for “{button}” must be 1–64 UTF-8 bytes; current value is {bytes} bytes.",
     RESERVED_CALLBACK_PREFIX: "Callback for “{button}” uses reserved prefix {prefix}.",
     INVALID_URL: "Button “{button}” has an invalid HTTP/HTTPS URL.",
@@ -31,6 +32,34 @@ const messages: Record<AppLocale, Record<string, string>> = {
     DUPLICATE_BOT_COMMAND: "Bot command /{command} is duplicated.",
     EMPTY_MENU_BUTTON_TEXT: "Web App menu button text is required.",
     INVALID_MENU_WEBAPP_URL: "Web App menu button URL must use HTTPS.",
+
+    UNKNOWN_TEMPLATE_PATH: "Template path “{path}” used by “{owner}” is unknown.",
+    INVALID_VARIABLE_KEY: "Variable key “{key}” is invalid or reserved.",
+    VARIABLE_TYPE_MISMATCH: "Default value for variable “{key}” does not match its type.",
+    DUPLICATE_VARIABLE_KEY: "Variable key “{key}” is duplicated.",
+    INVALID_ENV_KEY: "Environment variable name “{key}” must use uppercase letters, digits and underscores and cannot start with a digit.",
+    DUPLICATE_ENV_KEY: "Environment variable name “{key}” is duplicated.",
+    EMPTY_NODE_NAME: "Logic node of type “{node}” has no name.",
+    EMPTY_INPUT_PROMPT: "Input node “{node}” needs a prompt.",
+    INVALID_INPUT_VARIABLE: "Input node “{node}” must save to an input.* path.",
+    INVALID_INPUT_BOUNDS: "Input validation bounds on “{node}” are inconsistent.",
+    INVALID_INPUT_PATTERN: "Input node “{node}” contains an invalid regular expression.",
+    MISSING_NEXT_TARGET: "Logic node “{node}” needs a NEXT target.",
+    EMPTY_CONDITION: "Condition node “{node}” must contain at least one rule.",
+    EMPTY_CONDITION_OPERAND: "Condition node “{node}” has an empty required operand.",
+    MISSING_TRUE_TARGET: "Condition node “{node}” needs a TRUE target.",
+    MISSING_FALSE_TARGET: "Condition node “{node}” needs a FALSE target.",
+    UNKNOWN_SET_VARIABLE: "Set Variable references unknown variable “{key}”.",
+    INVALID_HTTP_URL: "HTTP node “{node}” has an invalid URL.",
+    INVALID_HTTP_RESULT_KEY: "HTTP result key “{key}” is invalid.",
+    INVALID_HTTP_TIMEOUT: "HTTP node “{node}” has an invalid timeout.",
+    INVALID_HTTP_JSON: "HTTP node “{node}” contains invalid JSON body syntax.",
+    INVALID_HTTP_MOCK_STATUS: "HTTP node “{node}” has an invalid mock status code.",
+    MISSING_SUCCESS_TARGET: "HTTP node “{node}” needs a SUCCESS target.",
+    MISSING_ERROR_TARGET: "HTTP node “{node}” needs an ERROR target.",
+    EMPTY_SEND_MESSAGE: "Send Message node “{node}” has empty text.",
+    MISSING_FLOW_TARGET: "Logic node “{node}” points to a target that no longer exists.",
+    DUPLICATE_HTTP_RESULT_KEY: "HTTP result key “{key}” is used by more than one HTTP node.",
   },
   ru: {
     NO_SCREENS: "В проекте должен быть хотя бы один экран.",
@@ -40,6 +69,7 @@ const messages: Record<AppLocale, Record<string, string>> = {
     NO_BUTTONS: "У экрана «{screen}» нет кнопок.",
     EMPTY_BUTTON_TEXT: "У inline-кнопки на экране «{screen}» нет текста.",
     MISSING_SCREEN_TARGET: "Кнопка «{button}» ведёт на отсутствующий экран.",
+    MISSING_NODE_TARGET: "Кнопка «{button}» ведёт на отсутствующий логический узел.",
     INVALID_CALLBACK_LENGTH: "Callback кнопки «{button}» должен занимать 1–64 байта UTF-8; сейчас {bytes}.",
     RESERVED_CALLBACK_PREFIX: "Callback кнопки «{button}» использует зарезервированный префикс {prefix}.",
     INVALID_URL: "У кнопки «{button}» некорректный HTTP/HTTPS URL.",
@@ -60,9 +90,37 @@ const messages: Record<AppLocale, Record<string, string>> = {
     DUPLICATE_BOT_COMMAND: "Команда бота /{command} дублируется.",
     EMPTY_MENU_BUTTON_TEXT: "Для Web App кнопки меню нужен текст.",
     INVALID_MENU_WEBAPP_URL: "URL Web App кнопки меню должен использовать HTTPS.",
+
+    UNKNOWN_TEMPLATE_PATH: "Неизвестный путь шаблона «{path}» используется в «{owner}».",
+    INVALID_VARIABLE_KEY: "Ключ переменной «{key}» некорректен или зарезервирован.",
+    VARIABLE_TYPE_MISMATCH: "Значение по умолчанию переменной «{key}» не соответствует её типу.",
+    DUPLICATE_VARIABLE_KEY: "Ключ переменной «{key}» используется несколько раз.",
+    INVALID_ENV_KEY: "Имя переменной окружения «{key}» должно состоять из заглавных латинских букв, цифр и подчёркиваний и не начинаться с цифры.",
+    DUPLICATE_ENV_KEY: "Имя переменной окружения «{key}» используется несколько раз.",
+    EMPTY_NODE_NAME: "У логического узла типа «{node}» нет названия.",
+    EMPTY_INPUT_PROMPT: "Для узла ввода «{node}» нужен вопрос пользователю.",
+    INVALID_INPUT_VARIABLE: "Узел ввода «{node}» должен сохранять ответ в путь input.*.",
+    INVALID_INPUT_BOUNDS: "У узла ввода «{node}» некорректные границы валидации.",
+    INVALID_INPUT_PATTERN: "В узле ввода «{node}» указан некорректный RegExp.",
+    MISSING_NEXT_TARGET: "Для узла «{node}» не задан переход NEXT.",
+    EMPTY_CONDITION: "В узле условия «{node}» должно быть хотя бы одно правило.",
+    EMPTY_CONDITION_OPERAND: "В узле условия «{node}» не заполнен обязательный операнд.",
+    MISSING_TRUE_TARGET: "Для условия «{node}» не задан переход TRUE.",
+    MISSING_FALSE_TARGET: "Для условия «{node}» не задан переход FALSE.",
+    UNKNOWN_SET_VARIABLE: "Узел Set Variable ссылается на неизвестную переменную «{key}».",
+    INVALID_HTTP_URL: "У HTTP-узла «{node}» некорректный URL.",
+    INVALID_HTTP_RESULT_KEY: "Некорректный ключ результата HTTP «{key}».",
+    INVALID_HTTP_TIMEOUT: "У HTTP-узла «{node}» некорректный таймаут.",
+    INVALID_HTTP_JSON: "HTTP-узел «{node}» содержит некорректный JSON в body.",
+    INVALID_HTTP_MOCK_STATUS: "У HTTP-узла «{node}» некорректный mock status.",
+    MISSING_SUCCESS_TARGET: "Для HTTP-узла «{node}» не задан переход SUCCESS.",
+    MISSING_ERROR_TARGET: "Для HTTP-узла «{node}» не задан переход ERROR.",
+    EMPTY_SEND_MESSAGE: "В узле отправки сообщения «{node}» пустой текст.",
+    MISSING_FLOW_TARGET: "Узел «{node}» ведёт на цель, которой больше нет.",
+    DUPLICATE_HTTP_RESULT_KEY: "Ключ результата HTTP «{key}» используется несколькими HTTP-узлами.",
   },
 };
 
 export function translateValidationIssue(issue: ValidationIssue, locale: AppLocale): string {
-  return formatTemplate(messages[locale][issue.code] ?? issue.code, issue.params ?? {});
+  return formatTemplate(validationMessages[locale][issue.code] ?? issue.code, issue.params ?? {});
 }

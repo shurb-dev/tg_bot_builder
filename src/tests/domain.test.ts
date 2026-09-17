@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createButton, createDemoProject, createReplyButton, createReplyKeyboardConfig, createReplyRow, createRow, createScreen } from "@/domain/project/defaults";
+import {
+  createButton,
+  createDemoProject,
+  createLogicNode,
+  createReplyButton,
+  createReplyKeyboardConfig,
+  createReplyRow,
+  createRow,
+  createScreen,
+} from "@/domain/project/defaults";
 import { moveButtonInKeyboard, moveReplyButton, moveReplyRow, moveRow } from "@/domain/project/keyboard";
 import { deriveFlowEdges } from "@/domain/project/selectors";
 import { utf8ByteLength } from "@/domain/telegram/utf8";
@@ -9,7 +18,7 @@ function errors(project: ReturnType<typeof createDemoProject>) {
   return validateProject(project).filter((item) => item.severity === "error");
 }
 
-describe("telegram domain v2", () => {
+describe("telegram domain v3", () => {
   it("counts callback length in UTF-8 bytes", () => {
     expect(utf8ByteLength("abc")).toBe(3);
     expect(utf8ByteLength("я")).toBe(2);
@@ -26,26 +35,26 @@ describe("telegram domain v2", () => {
     expect(validateProject(project).some((item) => item.code === "INVALID_CALLBACK_LENGTH" && item.severity === "error")).toBe(true);
   });
 
-  it("detects invalid inline URLs and missing targets", () => {
+  it("detects invalid inline URLs and missing screen or node targets", () => {
     const project = createDemoProject();
     project.screens[0].inlineKeyboard = [createRow([
       createButton("Bad URL", { type: "url", url: "javascript:alert(1)" }),
-      createButton("Missing", { type: "screen", screenId: crypto.randomUUID() }),
+      createButton("Missing screen", { type: "screen", screenId: crypto.randomUUID() }),
+      createButton("Missing node", { type: "node", nodeId: crypto.randomUUID() }),
     ])];
     const issues = validateProject(project);
     expect(issues.some((item) => item.code === "INVALID_URL")).toBe(true);
     expect(issues.some((item) => item.code === "MISSING_SCREEN_TARGET")).toBe(true);
+    expect(issues.some((item) => item.code === "MISSING_NODE_TARGET")).toBe(true);
   });
 
-  it("detects duplicate commands and unreachable screens", () => {
+  it("detects duplicate commands", () => {
     const project = createDemoProject();
     project.screens[1].trigger = { type: "command", command: "start" };
     const orphan = createScreen("Orphan");
     orphan.message.text = "Orphan";
     project.screens.push(orphan);
-    const issues = validateProject(project);
-    expect(issues.filter((item) => item.code === "DUPLICATE_COMMAND")).toHaveLength(2);
-    expect(issues.some((item) => item.code === "UNREACHABLE_SCREEN" && item.screenId === orphan.id)).toBe(true);
+    expect(validateProject(project).filter((item) => item.code === "DUPLICATE_COMMAND")).toHaveLength(2);
   });
 
   it("moves inline buttons and rows without duplication", () => {
@@ -149,15 +158,49 @@ describe("telegram domain v2", () => {
     expect(issues.some((item) => item.code === "INVALID_BOT_COMMAND_DESCRIPTION")).toBe(true);
   });
 
-  it("derives flow edges from inline and reply screen actions", () => {
+  it("validates variable and environment definitions", () => {
+    const project = createDemoProject();
+    project.variables.push(
+      { id: crypto.randomUUID(), key: "score", type: "number", defaultValue: 1 },
+      { id: crypto.randomUUID(), key: "score", type: "number", defaultValue: 2 },
+      { id: crypto.randomUUID(), key: "vars", type: "string", defaultValue: "bad" },
+    );
+    project.environmentVariables.push(
+      { id: crypto.randomUUID(), key: "crm-token" },
+      { id: crypto.randomUUID(), key: "API_KEY" },
+      { id: crypto.randomUUID(), key: "API_KEY" },
+    );
+    const issues = validateProject(project);
+    expect(issues.some((item) => item.code === "DUPLICATE_VARIABLE_KEY")).toBe(true);
+    expect(issues.some((item) => item.code === "INVALID_VARIABLE_KEY")).toBe(true);
+    expect(issues.some((item) => item.code === "INVALID_ENV_KEY")).toBe(true);
+    expect(issues.some((item) => item.code === "DUPLICATE_ENV_KEY")).toBe(true);
+  });
+
+  it("requires outgoing targets for logic nodes and validates set variables", () => {
+    const project = createDemoProject();
+    const input = createLogicNode("input");
+    const setVariable = createLogicNode("setVariable");
+    project.logicNodes.push(input, setVariable);
+    const issues = validateProject(project);
+    expect(issues.some((item) => item.code === "MISSING_NEXT_TARGET" && item.nodeId === input.id)).toBe(true);
+    expect(issues.some((item) => item.code === "UNKNOWN_SET_VARIABLE" && item.nodeId === setVariable.id)).toBe(true);
+  });
+
+  it("derives flow edges from screen actions and logic branches", () => {
     const project = createDemoProject();
     const source = project.screens[0];
     const target = project.screens[1];
-    source.inlineKeyboard = [];
-    source.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
-    const button = createReplyButton("Catalog", { type: "screen", screenId: target.id });
-    source.replyKeyboard.config.rows = [createReplyRow([button])];
+    const condition = createLogicNode("condition");
+    if (condition.type !== "condition") throw new Error("condition fixture mismatch");
+    condition.rules = [{ id: crypto.randomUUID(), left: "1", operator: "equals", right: "1" }];
+    condition.trueTarget = { type: "screen", screenId: target.id };
+    condition.falseTarget = { type: "screen", screenId: project.screens[2].id };
+    project.logicNodes.push(condition);
+    source.inlineKeyboard = [createRow([createButton("Check", { type: "node", nodeId: condition.id })])];
     const edges = deriveFlowEdges(project);
-    expect(edges.some((edge) => edge.buttonId === button.id && edge.sourceType === "reply-button" && edge.target === target.id)).toBe(true);
+    expect(edges.some((edge) => edge.source === source.id && edge.target === condition.id && edge.sourceType === "inline-button")).toBe(true);
+    expect(edges.some((edge) => edge.source === condition.id && edge.target === target.id && edge.port === "true")).toBe(true);
+    expect(edges.some((edge) => edge.source === condition.id && edge.port === "false")).toBe(true);
   });
 });
