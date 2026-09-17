@@ -192,6 +192,7 @@ describe("telegram domain v3", () => {
     const source = project.screens[0];
     const target = project.screens[1];
     const condition = createLogicNode("condition");
+    if (condition.type !== "condition") throw new Error("condition fixture mismatch");
     condition.rules = [{ id: crypto.randomUUID(), left: "1", operator: "equals", right: "1" }];
     condition.trueTarget = { type: "screen", screenId: target.id };
     condition.falseTarget = { type: "screen", screenId: project.screens[2].id };
