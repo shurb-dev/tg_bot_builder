@@ -3,7 +3,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import JSZip from "jszip";
 import { expect, test } from "@playwright/test";
-import { createDemoProject, createLogicNode } from "../src/domain/project/defaults";
+import {
+  createDemoProject,
+  createLogicNode,
+  createReplyButton,
+  createReplyKeyboardConfig,
+  createReplyRow,
+} from "../src/domain/project/defaults";
 import type { Project } from "../src/domain/project/types";
 
 const STORAGE_KEY = "telegram-bot-visual-builder:project:v1";
@@ -56,6 +62,20 @@ function createLeadFlowProject(): Project {
 
   project.logicNodes.push(input, setVariable, condition, http, send);
   project.screens[0].inlineKeyboard[0].buttons[0].action = { type: "node", nodeId: input.id };
+
+  const replyConfig = createReplyKeyboardConfig();
+  replyConfig.inputFieldPlaceholder = "Choose an action";
+  replyConfig.rows = [
+    createReplyRow([
+      createReplyButton("Profile reply", { type: "screen", screenId: project.screens[2].id }),
+      createReplyButton("Support reply", { type: "screen", screenId: project.screens[3].id }),
+    ]),
+    createReplyRow([
+      createReplyButton("Catalog reply", { type: "screen", screenId: project.screens[1].id }),
+    ]),
+  ];
+  project.screens[0].replyKeyboard = { mode: "show", config: replyConfig };
+
   return project;
 }
 
@@ -94,13 +114,30 @@ test("mandatory V1.2 runtime browser smoke", async ({ page }, testInfo) => {
   for (const name of ["Ask lead name", "Save lead name", "Has lead name", "Create lead", "Confirm lead"]) {
     await expect(page.locator(".react-flow__node").filter({ hasText: name })).toHaveCount(1);
   }
-  expect(await page.locator(".react-flow__edge").count()).toBeGreaterThanOrEqual(11);
+  expect(await page.locator(".react-flow__edge").count()).toBeGreaterThanOrEqual(14);
 
   // Test Mode executes a realistic lead flow through Input → Set Variable → Condition → HTTP mock → Send Message.
   await page.getByRole("button", { name: "Test", exact: true }).click();
   await expect(page.getByText("Test simulator", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start /start", exact: true }).click();
   await expect(page.getByText("Добро пожаловать!", { exact: false })).toBeVisible();
+
+  // Simulator must preserve Telegram row geometry instead of flattening rows into full-width buttons.
+  const inlineKeyboard = page.getByTestId("test-inline-keyboard");
+  await expect(inlineKeyboard).toBeVisible();
+  const inlineRows = inlineKeyboard.locator(":scope > div");
+  await expect(inlineRows).toHaveCount(2);
+  await expect(inlineRows.nth(0).getByRole("button")).toHaveCount(2);
+  await expect(inlineRows.nth(1).getByRole("button")).toHaveCount(1);
+
+  const replyKeyboard = page.getByTestId("test-reply-keyboard");
+  await expect(replyKeyboard).toBeVisible();
+  const replyRows = replyKeyboard.locator(":scope > div");
+  await expect(replyRows).toHaveCount(2);
+  await expect(replyRows.nth(0).getByRole("button")).toHaveCount(2);
+  await expect(replyRows.nth(1).getByRole("button")).toHaveCount(1);
+  await expect(page.getByPlaceholder("Choose an action", { exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: "🛒 Каталог", exact: true }).click();
   await expect(page.getByText("Your name?", { exact: true })).toBeVisible();
 
