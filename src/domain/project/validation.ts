@@ -46,7 +46,7 @@ export function validateProject(project: Project): ValidationIssue[] {
 
   const screenIds = new Set(project.screens.map((screen) => screen.id));
   const commandOwners = new Map<string, string[]>();
-  const replyNavigation = new Map<string, { screenId: string; buttonId: string }[]>();
+  const replyTextRoutes = new Map<string, { screenId: string; buttonId: string }[]>();
 
   for (const screen of project.screens) {
     const name = screen.name.trim() || "Unnamed screen";
@@ -89,10 +89,12 @@ export function validateProject(project: Project): ValidationIssue[] {
         for (const button of row.buttons) {
           const label = button.text || "Untitled";
           if (!button.text.trim()) issues.push(issue("error", "EMPTY_REPLY_BUTTON_TEXT", { screen: name }, screen.id, button.id, "reply"));
-          if (button.action.type === "screen") {
-            if (!screenIds.has(button.action.screenId)) issues.push(issue("error", "MISSING_REPLY_SCREEN_TARGET", { button: label }, screen.id, button.id, "reply"));
+          if (button.action.type === "screen" && !screenIds.has(button.action.screenId)) {
+            issues.push(issue("error", "MISSING_REPLY_SCREEN_TARGET", { button: label }, screen.id, button.id, "reply"));
+          }
+          if (button.action.type === "screen" || button.action.type === "text") {
             const key = button.text.trim();
-            if (key) replyNavigation.set(key, [...(replyNavigation.get(key) ?? []), { screenId: screen.id, buttonId: button.id }]);
+            if (key) replyTextRoutes.set(key, [...(replyTextRoutes.get(key) ?? []), { screenId: screen.id, buttonId: button.id }]);
           }
           if (button.action.type === "webApp" && !isValidHttpsUrl(button.action.url)) issues.push(issue("error", "INVALID_WEBAPP_URL", { button: label }, screen.id, button.id, "reply"));
         }
@@ -105,7 +107,7 @@ export function validateProject(project: Project): ValidationIssue[] {
   }
   if (!commandOwners.has("start")) issues.push(issue("warning", "NO_START"));
 
-  for (const [text, owners] of replyNavigation) {
+  for (const [text, owners] of replyTextRoutes) {
     if (owners.length > 1) owners.forEach(({ screenId, buttonId }) => issues.push(issue("error", "DUPLICATE_REPLY_NAV_TEXT", { text }, screenId, buttonId, "reply")));
   }
 

@@ -87,6 +87,19 @@ describe("telegram domain v2", () => {
     expect(issues.filter((item) => item.code === "DUPLICATE_REPLY_NAV_TEXT")).toHaveLength(2);
   });
 
+  it("rejects ambiguous reply navigation and text handlers", () => {
+    const project = createDemoProject();
+    const main = project.screens[0];
+    const catalog = project.screens[1];
+    main.inlineKeyboard = [];
+    main.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
+    main.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Catalog", { type: "screen", screenId: catalog.id })])];
+    catalog.inlineKeyboard = [];
+    catalog.replyKeyboard = { mode: "show", config: createReplyKeyboardConfig() };
+    catalog.replyKeyboard.config.rows = [createReplyRow([createReplyButton("Catalog", { type: "text" })])];
+    expect(validateProject(project).filter((item) => item.code === "DUPLICATE_REPLY_NAV_TEXT")).toHaveLength(2);
+  });
+
   it("accepts HTTPS Web Apps and rejects missing reply screen targets", () => {
     const project = createDemoProject();
     const screen = project.screens[0];
