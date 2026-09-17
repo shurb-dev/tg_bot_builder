@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createDemoProject, createLogicNode } from "@/domain/project/defaults";
 import type { ConditionNode, ConditionOperator, InputNode } from "@/domain/project/types";
 import { evaluateCondition, evaluateConditionRule } from "@/runtime/condition";
-import { createRuntimeContext, createSimulationState, runSimulation, submitSimulationInput } from "@/runtime/engine";
+import { createSimulationState, runSimulation, submitSimulationInput } from "@/runtime/engine";
 import { validateInputValue } from "@/runtime/input";
 import { extractTemplatePaths, getPathValue, isKnownTemplatePath, resolveTemplate } from "@/runtime/templates";
 import type { HttpAdapter, RuntimeContext } from "@/runtime/types";
